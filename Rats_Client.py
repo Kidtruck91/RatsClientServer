@@ -2,7 +2,7 @@ import socket
 import pickle
 from game_logic import Game, Player
 
-SERVER_HOST = "127.0.0.1"  # Replace with your actual local IP
+SERVER_HOST = "192.168.1.7"  # Replace with your actual local IP
 SERVER_PORT = 5555
 
 def main():
@@ -87,10 +87,9 @@ def run_multiplayer_client():
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect((SERVER_HOST, SERVER_PORT))
 
-        last_seen_players = []  # Store the last known player list
-
         while True:
             response = pickle.loads(client.recv(4096))  # ✅ Ensure full message is received
+            print(f"DEBUG: Client received: {response}")  # Debugging received data
 
             if response.get("command") == "host_control":
                 print("\n🎮 You are the host! 🎮")
@@ -102,29 +101,54 @@ def run_multiplayer_client():
                     start_game = input("Type 'start' to begin the game: ").strip().lower()
                     if start_game == "start":
                         client.sendall(pickle.dumps({"start_game": True}))
+                        print("DEBUG: Host sent start command")
                         break
                     print("Invalid input. Type 'start' to begin.")
 
             elif response.get("command") == "waiting":
-                current_players = response["players"]
-
-                if current_players != last_seen_players:
-                    print("\nWaiting for the host to start the game...")
-                    print("Connected players:")
-                    for player in current_players:
-                        print(f"- {player}")
-
-                    last_seen_players = current_players  # ✅ Update last known players
+                print("\nWaiting for the host to start the game...")
+                print("Connected players:")
+                for player in response["players"]:
+                    print(f"- {player}")
 
             elif response.get("command") == "start":
                 print("\n🎲 Game is starting!\n")
-                break  # ✅ Exit waiting loop and proceed to gameplay
+                play_multiplayer_game(client)  # ✅ Transition into the game loop
+                return  # ✅ Prevents returning to the menu
 
     except ConnectionRefusedError:
         print("Could not connect to the server. Ensure the server is running.")
 
     finally:
         client.close()
+
+def play_multiplayer_game(client):
+    """Handles game communication after the game starts."""
+    while True:
+        try:
+            game_state = pickle.loads(client.recv(4096))  # ✅ Ensure complete message
+            game, player_name = game_state  # ✅ Unpack game state
+
+            current_player = game.players[game.turn]
+
+            if current_player.name == player_name:
+                print(f"\nYour turn, {current_player.name}!")
+                print(f"Your cards: {current_player.get_visible_cards()}")  # Show only player's cards
+                print("Available actions:", ", ".join(game.get_available_actions()))
+
+                action = input("Choose an action: ").strip().lower()
+                if action in game.get_available_actions():
+                    client.sendall(pickle.dumps(action))  # ✅ Send action to server
+                else:
+                    print("Invalid action. Try again.")
+
+            else:
+                print(f"\nWaiting for {current_player.name} to play...")
+
+        except (ConnectionResetError, EOFError):
+            print("Disconnected from the server.")
+            break
+
 
 if __name__ == "__main__":
     main()
