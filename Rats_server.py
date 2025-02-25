@@ -3,12 +3,12 @@ import pickle
 import threading
 from game_logic import Game, Player
 
-# Automatically get the server's local IP address
+# Get the server's local IP address
 def get_local_ip():
-    """Finds the local IP address of the device running this code."""
+    """Finds the local IP address of the device running the server."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(("8.8.8.8", 80))  # Connects to an external server to get the local IP
+        s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
     except Exception:
         local_ip = "127.0.0.1"  # Fallback to localhost
@@ -17,7 +17,7 @@ def get_local_ip():
     return local_ip
 
 SERVER_HOST = get_local_ip()  # Get current machine's IP
-SERVER_PORT = 5555            # Choose an open port
+SERVER_PORT = 5555            # Port to listen on
 
 clients = []
 game = None
@@ -41,7 +41,7 @@ def start_server():
     while len(players) < 4:
         client_socket, addr = server.accept()
         player_id = len(players) + 1
-        print(f"✅ Player {player_id} connected from {addr}")
+        print(f"Player {player_id} connected from {addr}")
 
         new_player = Player(f"Player {player_id}", is_human=True)
         players.append(new_player)
