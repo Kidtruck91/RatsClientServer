@@ -32,9 +32,9 @@ def start_server():
     server.listen(4)  # Allow up to 4 players
 
     # **Print connection info for clients**
-    print(f"🖥️  Rats! Multiplayer Server is running on:")
-    print(f"   📡 Local IP: {SERVER_HOST}")
-    print(f"   🌐 Port: {SERVER_PORT}")
+    print(f"Rats! Multiplayer Server is running on:")
+    print(f"Local IP: {SERVER_HOST}")
+    print(f"Port: {SERVER_PORT}")
     print("\nClients should manually enter this IP and port to connect.")
 
     players = []
