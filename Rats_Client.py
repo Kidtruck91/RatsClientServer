@@ -2,7 +2,7 @@ import socket
 import pickle
 from game_logic import Game, Player
 
-SERVER_HOST = "127.0.0.1"  # Use localhost or adjust for remote play
+SERVER_HOST = "192.168.1.7"  # Use localhost or adjust for remote play
 SERVER_PORT = 5555
 
 def main():
