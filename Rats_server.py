@@ -84,6 +84,9 @@ def handle_host(client_socket):
 def start_game():
     """Initializes and starts the game with connected players."""
     global game
+    if game:
+        print("⚠️ Game has already started! Ignoring extra start command.")
+        return  # ✅ Prevent multiple game starts
     game = Game(*[p for _, p in clients])  # Use connected players
     print("🎮 Game is starting...")
 

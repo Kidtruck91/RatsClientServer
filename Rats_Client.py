@@ -126,8 +126,16 @@ def play_multiplayer_game(client):
     """Handles game communication after the game starts."""
     while True:
         try:
-            game_state = pickle.loads(client.recv(4096))  # ✅ Ensure complete message
-            game, player_name = game_state  # ✅ Unpack game state
+            response = client.recv(4096)
+            game_state = pickle.loads(response)  # ✅ Ensure full game state is received
+            print(f"DEBUG: Received game state: {game_state}")  # ✅ Debugging received data
+
+            # ✅ Ensure game_state is a tuple
+            if isinstance(game_state, tuple) and len(game_state) == 2:
+                game, player_name = game_state
+            else:
+                print("ERROR: Invalid game state received!")
+                continue  # Ignore bad data and wait for the next update
 
             current_player = game.players[game.turn]
 
@@ -145,8 +153,8 @@ def play_multiplayer_game(client):
             else:
                 print(f"\nWaiting for {current_player.name} to play...")
 
-        except (ConnectionResetError, EOFError):
-            print("Disconnected from the server.")
+        except (ConnectionResetError, EOFError, pickle.UnpicklingError) as e:
+            print(f"Disconnected from the server. Error: {e}")
             break
 
 
