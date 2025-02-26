@@ -78,7 +78,7 @@ def handle_host(client_socket):
             if response.get("start_game"):
                 print("DEBUG: Host started the game!")
                 start_game()
-                break  # ✅ Exit loop after starting the game
+                return  
 
     except Exception as e:
         print(f"Host disconnected before starting: {e}")
