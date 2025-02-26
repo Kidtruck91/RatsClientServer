@@ -122,7 +122,7 @@ def start_server():
 
         new_player = Player(f"Player {player_id}", is_human=True)
         clients.append((client_socket, new_player))
-
+        send_to_all({"command": "waiting", "players": [p.name for _, p in clients]})
         # ✅ If the first player is connecting, they are the host
         if len(clients) == 1:
             print(f"👑 Player {player_id} is the host!")
