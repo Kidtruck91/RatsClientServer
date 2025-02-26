@@ -69,14 +69,16 @@ def handle_host(client_socket):
     """Handles the host before the game starts."""
     try:
         while True:
-            # ✅ Send player list update to host every loop
+            # ✅ Send player list update to host
             send_to_client(client_socket, {"command": "host_control", "players": [p.name for _, p in clients]})
 
             response = pickle.loads(client_socket.recv(4096))
+            print(f"DEBUG: Host response received: {response}")
+
             if response.get("start_game"):
-                print("Host started the game!")
+                print("DEBUG: Host started the game!")
                 start_game()
-                break  # ✅ Exit after starting the game
+                break  # ✅ Exit loop after starting the game
 
     except Exception as e:
         print(f"Host disconnected before starting: {e}")

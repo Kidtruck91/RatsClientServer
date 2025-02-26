@@ -102,9 +102,11 @@ def run_multiplayer_client():
                     if start_game == "start":
                         client.sendall(pickle.dumps({"start_game": True}))
                         print("DEBUG: Host sent start command")
-                        break
-                    print("Invalid input. Type 'start' to begin.")
+                        break  # ✅ Exit the loop after sending start command
+
+                # ✅ Prevent looping back into the host menu
                 continue
+
             elif response.get("command") == "waiting":
                 print("\nWaiting for the host to start the game...")
                 print("Connected players:")
@@ -113,8 +115,8 @@ def run_multiplayer_client():
 
             elif response.get("command") == "start":
                 print("\n🎲 Game is starting!\n")
-                play_multiplayer_game(client)  # ✅ Transition into the game loop
-                return  # ✅ Prevents returning to the menu
+                play_multiplayer_game(client)  # ✅ Transition into gameplay
+                return  # ✅ Prevent going back to the menu
 
     except ConnectionRefusedError:
         print("Could not connect to the server. Ensure the server is running.")
