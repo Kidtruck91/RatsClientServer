@@ -104,7 +104,7 @@ def run_multiplayer_client():
                         print("DEBUG: Host sent start command")
                         break
                     print("Invalid input. Type 'start' to begin.")
-
+                continue
             elif response.get("command") == "waiting":
                 print("\nWaiting for the host to start the game...")
                 print("Connected players:")
