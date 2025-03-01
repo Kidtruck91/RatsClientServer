@@ -100,12 +100,13 @@ def handle_host(client_socket):
 
             if response.get("start_game"):
                 print("🎮 Host started the game!")
-                start_game()
+                send_to_all({"command": "start"})  # ✅ Tell all clients the game has started
+                start_game()  # ✅ Start the game on the server
                 return  # ✅ Exit `handle_host()` after the game starts
 
     except Exception as e:
         print(f"❌ Host disconnected before starting: {e}")
-
+        
 def start_game():
     """Initializes and starts the game with connected players."""
     global game

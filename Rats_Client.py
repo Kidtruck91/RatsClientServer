@@ -81,8 +81,6 @@ def run_cli_game(game):
 
 def run_multiplayer_client():
     """Handles client-side multiplayer connection to the server."""
-    global SERVER_HOST, SERVER_PORT
-
     print("\nStarting Multiplayer Mode...")
 
     try:
@@ -105,7 +103,8 @@ def run_multiplayer_client():
                         client.sendall(pickle.dumps({"start_game": True}))
                         print("DEBUG: Host sent start command")
                         break
-                    print("Invalid input. Type 'start' to begin.")
+
+                continue
 
             elif response.get("command") == "waiting":
                 print("\nWaiting for the host to start the game...")
@@ -115,8 +114,8 @@ def run_multiplayer_client():
 
             elif response.get("command") == "start":
                 print("\n🎲 Game is starting!\n")
-                play_multiplayer_game(client)
-                return
+                play_multiplayer_game(client)  # ✅ Start the actual game
+                return  # ✅ Prevent looping back to the menu
 
     except ConnectionRefusedError:
         print("Could not connect to the server. Ensure the server is running.")
