@@ -6,37 +6,26 @@ from game_logic import Game, Player
 # No-IP Credentials
 NOIP_HOSTNAME = "ratsmpserver.ddns.net"  # Replace with your No-IP hostname
 NOIP_USERNAME = "2by66j9"
-NOIP_PASSWORD = "Evhv3AVaYpLh"
+NOIP_UPDATE_KEY = "Evhv3AVaYpLh"
 
 def update_noip():
     """Updates No-IP with the server's current public IP."""
     url = f"https://dynupdate.no-ip.com/nic/update?hostname={NOIP_HOSTNAME}"
-    response = requests.get(url, auth=(NOIP_USERNAME, NOIP_PASSWORD))
+    response = requests.get(url, auth=(NOIP_USERNAME, NOIP_UPDATE_KEY))
 
-    if response.status_code == 200:
-        print(f"✅ No-IP Updated: {response.text}")
+    if "good" in response.text or "nochg" in response.text:
+        print(f"✅ No-IP Updated Successfully: {response.text}")
     else:
         print(f"❌ No-IP Update Failed: {response.status_code} - {response.text}")
 
 def get_public_ip():
     """Fetches the server's current public IP address."""
     return requests.get("https://ifconfig.me/ip").text.strip()
-def get_local_ip():
-    """Finds the local IP address of the server."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))  # Connects to a public server to determine local IP
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = "127.0.0.1"  # Fallback to localhost
-    finally:
-        s.close()
-    return local_ip
 
-SERVER_HOST = "0.0.0.0"#get_local_ip()  # Automatically detects and sets the local IP
+SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 5555
 
-clients = []  # List of (socket, player) tuples
+clients = []  # List of (socket, player_name) tuples
 game = None   # Global game instance
 
 def send_to_client(client_socket, message):
@@ -47,50 +36,45 @@ def send_to_client(client_socket, message):
         print(f"Error sending message to client: {e}")
 
 def send_to_all(message):
-    """Sends a pickled message to all clients and logs it."""
-    print(f"DEBUG: Sending to all clients: {message}")  # ✅ Debugging log
+    """Sends a pickled message to all clients."""
+    print(f"DEBUG: Sending to all clients: {message}")  
     for client_socket, _ in clients:
         try:
             client_socket.sendall(pickle.dumps(message))
         except Exception as e:
             print(f"Error sending to client: {e}")
 
-
-def handle_client(client_socket, player):
+def handle_client(client_socket, player_name):
     """Handles communication with a single client after the game starts."""
     global game
 
     try:
         while True:
-            # Send the game state to the client
-            game_state = pickle.dumps((game, player.name))
+            game_state = pickle.dumps((game, player_name))
             client_socket.sendall(game_state)
 
-            # Receive the player's action
             data = client_socket.recv(4096)
             if not data:
-                break  # Exit loop if the client disconnects
+                break  
 
             action = pickle.loads(data)
-            print(f"{player.name} chose action: {action}")
+            print(f"{player_name} chose action: {action}")
 
-            # Perform the action if it's the player's turn
-            if game.players[game.turn] == player:
-                game.perform_action(player, action,client_socket, send_to_all)
-                send_to_all((game, player.name))
+            if game.players[game.turn].name == player_name:
+                game.perform_action(game.players[game.turn], action, client_socket, send_to_all)
+                send_to_all((game, player_name))
 
-                # Check if the game is over
                 if game.game_over:
                     break
 
     except (ConnectionResetError, EOFError):
-        print(f"{player.name} disconnected unexpectedly.")
+        print(f"{player_name} disconnected unexpectedly.")
     
     finally:
         client_socket.close()
 
 def handle_host(client_socket):
-    """Handles the host before the game starts and listens for the 'start' command."""
+    """Handles the host before the game starts."""
     try:
         while True:
             send_to_client(client_socket, {"command": "host_control", "players": [p[1] for p in clients]})
@@ -100,28 +84,27 @@ def handle_host(client_socket):
 
             if response.get("start_game"):
                 print("🎮 Host started the game!")
-                send_to_all({"command": "start"})  # ✅ Tell all clients the game has started
-                start_game()  # ✅ Start the game on the server
-                return  # ✅ Exit `handle_host()` after the game starts
+                send_to_all({"command": "start"})  
+                start_game()  
+                return  
 
     except Exception as e:
         print(f"❌ Host disconnected before starting: {e}")
-        
+
 def start_game():
     """Initializes and starts the game with connected players."""
     global game
     if game:
         print("⚠️ Game has already started! Ignoring extra start command.")
-        return  # ✅ Prevent multiple game starts
-    game = Game(*[p for _, p in clients])  # Use connected players
+        return  
+
+    game = Game(*[Player(p[1]) for p in clients])  
     print("🎮 Game is starting...")
 
-    # Send start signal to all clients
-    send_to_all({"command": "start"})
+    send_to_all({"command": "start"})  
 
-    # Start game communication threads
-    for client_socket, player in clients:
-        threading.Thread(target=handle_client, args=(client_socket, player)).start()
+    for client_socket, player_name in clients:
+        threading.Thread(target=handle_client, args=(client_socket, player_name)).start()
 
 def start_server():
     """Starts the game server, updates No-IP, and assigns the first player as the host."""
@@ -140,28 +123,20 @@ def start_server():
 
     players_connected = 0
 
-    while players_connected < 4:  # Accept up to 4 players
+    while players_connected < 4:  
         client_socket, addr = server.accept()
         print(f"✅ Player connected from {addr}")
-        clients.append((client_socket, f"Player {players_connected + 1}"))
         players_connected += 1
 
-        # ✅ Assign the first player as the host
-        if players_connected == 1:
-            print(f"👑 Player {players_connected} is the host!")
-            send_to_client(client_socket, {"command": "host_control", "players": [p[1] for p in clients]})
+        player_name = f"Player {players_connected}"
+        clients.append((client_socket, player_name))
 
-        # ✅ Notify all players about the new player list
         send_to_all({"command": "waiting", "players": [p[1] for p in clients]})
-def send_to_all(message):
-    """Sends a pickled message to all connected clients."""
-    print(f"DEBUG: Sending to all clients: {message}")  # ✅ Debugging log
-    for client_socket, _ in clients:
-        try:
-            client_socket.sendall(pickle.dumps(message))
-        except Exception as e:
-            print(f"Error sending to client: {e}")
 
+        if players_connected == 1:
+            print(f"👑 {player_name} is the host!")
+            send_to_client(client_socket, {"command": "host_control", "players": [p[1] for p in clients]})
+            threading.Thread(target=handle_host, args=(client_socket,)).start()
 
 if __name__ == "__main__":
     start_server()

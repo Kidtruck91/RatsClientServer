@@ -2,7 +2,7 @@ import socket
 import pickle
 from game_logic import Game, Player
 
-SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with your actual local IP
+SERVER_HOST = "ratsmpserver.ddns.net"
 SERVER_PORT = 5555
 
 def main():
@@ -60,7 +60,7 @@ def run_cli_game(game):
         print("\nOpponent Hands (As You Remember Them):")
         for opponent in game.players:
             if opponent != current_player:
-                known_hand = current_player.get_known_opponent_hand(opponent)  # Pass the opponent object
+                known_hand = current_player.get_known_opponent_hand(opponent)
                 print(f"{opponent.name}: {known_hand}")
 
         # **Show the player's own hand**
@@ -104,18 +104,16 @@ def run_multiplayer_client():
                         print("DEBUG: Host sent start command")
                         break
 
-                continue
-
             elif response.get("command") == "waiting":
-                print("\nWaiting for the host to start the game...")
+                print("\n🔄 Player list updated:")
                 print("Connected players:")
                 for player in response["players"]:
                     print(f"- {player}")
 
             elif response.get("command") == "start":
                 print("\n🎲 Game is starting!\n")
-                play_multiplayer_game(client)  # ✅ Start the actual game
-                return  # ✅ Prevent looping back to the menu
+                play_multiplayer_game(client)  
+                return  
 
     except ConnectionRefusedError:
         print("Could not connect to the server. Ensure the server is running.")
@@ -128,26 +126,27 @@ def play_multiplayer_game(client):
     while True:
         try:
             response = client.recv(4096)
-            game_state = pickle.loads(response)  # ✅ Ensure full game state is received
-            print(f"DEBUG: Received game state: {game_state}")  # ✅ Debugging received data
+            game_state = pickle.loads(response)  
+
+            print(f"DEBUG: Received game state: {game_state}")  
 
             # ✅ Ensure game_state is a tuple
             if isinstance(game_state, tuple) and len(game_state) == 2:
                 game, player_name = game_state
             else:
                 print("ERROR: Invalid game state received!")
-                continue  # Ignore bad data and wait for the next update
+                continue  
 
             current_player = game.players[game.turn]
 
             if current_player.name == player_name:
                 print(f"\nYour turn, {current_player.name}!")
-                print(f"Your cards: {current_player.get_visible_cards()}")  # Show only player's cards
+                print(f"Your cards: {current_player.get_visible_cards()}")  
                 print("Available actions:", ", ".join(game.get_available_actions()))
 
                 action = input("Choose an action: ").strip().lower()
                 if action in game.get_available_actions():
-                    client.sendall(pickle.dumps(action))  # ✅ Send action to server
+                    client.sendall(pickle.dumps(action))  
                 else:
                     print("Invalid action. Try again.")
 
