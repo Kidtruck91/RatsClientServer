@@ -1,8 +1,26 @@
 import socket
 import pickle
 import threading
+import requests
 from game_logic import Game, Player
+# No-IP Credentials
+NOIP_HOSTNAME = "ratsmpserver.ddns.net"  # Replace with your No-IP hostname
+NOIP_USERNAME = "2by66j9"
+NOIP_PASSWORD = "Evhv3AVaYpLh"
 
+def update_noip():
+    """Updates No-IP with the server's current public IP."""
+    url = f"https://dynupdate.no-ip.com/nic/update?hostname={NOIP_HOSTNAME}"
+    response = requests.get(url, auth=(NOIP_USERNAME, NOIP_PASSWORD))
+
+    if response.status_code == 200:
+        print(f"✅ No-IP Updated: {response.text}")
+    else:
+        print(f"❌ No-IP Update Failed: {response.status_code} - {response.text}")
+
+def get_public_ip():
+    """Fetches the server's current public IP address."""
+    return requests.get("https://ifconfig.me/ip").text.strip()
 def get_local_ip():
     """Finds the local IP address of the server."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,7 +76,8 @@ def handle_client(client_socket, player):
 
             # Perform the action if it's the player's turn
             if game.players[game.turn] == player:
-                game.perform_action(player, action)
+                game.perform_action(player, action,client_socket, send_to_all)
+                send_to_all((game, player.name))
 
                 # Check if the game is over
                 if game.game_over:
@@ -110,42 +129,35 @@ def start_game():
         threading.Thread(target=handle_client, args=(client_socket, player)).start()
 
 def start_server():
-    """Starts the server and waits for players to connect."""
+    """Starts the game server and updates No-IP."""
     global game
 
+    # ✅ Get public IP and update No-IP
+    public_ip = get_public_ip()
+    print(f"🌍 Server Public IP: {public_ip}")
+    update_noip()
+
+    # ✅ Start the server
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allows multiple connections on same machine
-    server.bind((SERVER_HOST, SERVER_PORT))
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("0.0.0.0", 5555))  # Listen on all interfaces
     server.listen(4)
 
-    print("\n🚀 **Rats! Multiplayer Server is Running!** 🚀")
-    print(f"🎮 Host IP Address: {SERVER_HOST}")  # ✅ Displays local IP
-    print(f"🌐 Port: {SERVER_PORT}")
-    print("📢 Clients should enter this IP in `Rats_Client.py` to connect!\n")
+    print(f"🚀 Server started at {public_ip}:5555 - Clients should connect to {NOIP_HOSTNAME}")
 
-    print("Waiting for players to connect...")
-
-    while len(clients) < 4:  # Allow up to 4 players
+    while len(clients) < 4:
         client_socket, addr = server.accept()
-        player_id = len(clients) + 1
-        print(f"✅ Player {player_id} connected from {addr}")
+        print(f"✅ Player connected from {addr}")
+        clients.append(client_socket)
 
-        new_player = Player(f"Player {player_id}", is_human=True)
-        clients.append((client_socket, new_player))
-
-        # ✅ Immediately send updated player list to ALL clients (including the host)
-        updated_players = {"command": "waiting", "players": [p.name for _, p in clients]}
-        send_to_all(updated_players)
-        print(f"DEBUG: Sent updated player list to all clients: {updated_players}")
-
-        # ✅ Assign the first player as the host
-        if len(clients) == 1:
-            print(f"👑 Player {player_id} is the host!")
-            send_to_client(client_socket, {"command": "host_control", "players": [p.name for _, p in clients]})
-            threading.Thread(target=handle_host, args=(client_socket, new_player)).start()
-
-        if len(clients) >= 2:
-            print("⏳ Waiting for host to start the game...")
+def send_to_all(message):
+    """Sends a pickled message to all connected clients."""
+    print(f"DEBUG: Sending to all clients: {message}")  # ✅ Debugging log
+    for client_socket, _ in clients:
+        try:
+            client_socket.sendall(pickle.dumps(message))
+        except Exception as e:
+            print(f"Error sending to client: {e}")
 
 
 if __name__ == "__main__":
