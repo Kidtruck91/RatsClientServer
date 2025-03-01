@@ -73,23 +73,31 @@ def handle_client(client_socket, player_name):
     finally:
         client_socket.close()
 
-def handle_host(client_socket):
-    """Handles the host before the game starts."""
+def handle_host(client_socket, player):
+    """Handles the host before the game starts, ensuring they receive player updates."""
     try:
         while True:
-            send_to_client(client_socket, {"command": "host_control", "players": [p[1] for p in clients]})
+            # ✅ Continuously send updated player list to the host
+            updated_players = {"command": "host_control", "players": [p.name for _, p in clients]}
+            send_to_client(client_socket, updated_players)
+            print(f"DEBUG: Sent updated player list to host: {updated_players}")
 
             response = pickle.loads(client_socket.recv(4096))
             print(f"DEBUG: Host response received: {response}")
 
             if response.get("start_game"):
-                print("🎮 Host started the game!")
-                send_to_all({"command": "start"})  
-                start_game()  
-                return  
+                print("DEBUG: Host started the game!")
+                send_to_all({"command": "start"})  # ✅ Notify all clients
+                start_game()
+
+                # ✅ Transition the host into normal gameplay
+                handle_client(client_socket, player)
+                return  # ✅ Exit `handle_host()` after game starts
 
     except Exception as e:
-        print(f"❌ Host disconnected before starting: {e}")
+        print(f"Host disconnected before starting: {e}")
+
+
 
 def start_game():
     """Initializes and starts the game with connected players."""
@@ -107,36 +115,47 @@ def start_game():
         threading.Thread(target=handle_client, args=(client_socket, player_name)).start()
 
 def start_server():
-    """Starts the game server, updates No-IP, and assigns the first player as the host."""
-    global game, clients
-
-    public_ip = get_public_ip()
-    print(f"🌍 Server Public IP: {public_ip}")
-    update_noip()
+    """Starts the server and waits for players to connect."""
+    global game
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("0.0.0.0", 5555))
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allows multiple connections on same machine
+    server.bind((SERVER_HOST, SERVER_PORT))
     server.listen(4)
 
-    print(f"🚀 Server started at {public_ip}:5555 - Clients should connect to {NOIP_HOSTNAME}")
+    print("\n🚀 **Rats! Multiplayer Server is Running!** 🚀")
+    print(f"🎮 Host IP Address: {SERVER_HOST}")  # ✅ Displays local IP
+    print(f"🌐 Port: {SERVER_PORT}")
+    print("📢 Clients should enter this IP in `Rats_Client.py` to connect!\n")
 
-    players_connected = 0
+    print("Waiting for players to connect...")
 
-    while players_connected < 4:  
+    host_socket = None
+    while len(clients) < 4:  # Allow up to 4 players
         client_socket, addr = server.accept()
-        print(f"✅ Player connected from {addr}")
-        players_connected += 1
+        player_id = len(clients) + 1
+        print(f"✅ Player {player_id} connected from {addr}")
 
-        player_name = f"Player {players_connected}"
-        clients.append((client_socket, player_name))
+        new_player = Player(f"Player {player_id}", is_human=True)
+        clients.append((client_socket, new_player))
 
-        send_to_all({"command": "waiting", "players": [p[1] for p in clients]})
+        # ✅ Immediately send updated player list to ALL clients
+        updated_players = {"command": "waiting", "players": [p.name for _, p in clients]}
+        send_to_all(updated_players)
+        print(f"DEBUG: Sent updated player list to all clients: {updated_players}")
 
-        if players_connected == 1:
-            print(f"👑 {player_name} is the host!")
-            send_to_client(client_socket, {"command": "host_control", "players": [p[1] for p in clients]})
-            threading.Thread(target=handle_host, args=(client_socket,)).start()
+        # ✅ Assign the first player as the host and store their socket
+        if len(clients) == 1:
+            print(f"👑 Player {player_id} is the host!")
+            host_socket = client_socket
+            send_to_client(client_socket, {"command": "host_control", "players": [p.name for _, p in clients]})
+            threading.Thread(target=handle_host, args=(client_socket, new_player)).start()
 
+        # ✅ If a new player joins, resend "host_control" update to the host
+        if host_socket:
+            send_to_client(host_socket, {"command": "host_control", "players": [p.name for _, p in clients]})
+
+        if len(clients) >= 2:
+            print("⏳ Waiting for host to start the game...")
 if __name__ == "__main__":
     start_server()

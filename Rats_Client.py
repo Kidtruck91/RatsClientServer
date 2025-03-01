@@ -2,7 +2,7 @@ import socket
 import pickle
 from game_logic import Game, Player
 
-SERVER_HOST = "ratsmpserver.ddns.net"
+SERVER_HOST = "ratsmpserver.ddns.net"  # ✅ Uses No-IP for automatic server discovery
 SERVER_PORT = 5555
 
 def main():
@@ -60,7 +60,7 @@ def run_cli_game(game):
         print("\nOpponent Hands (As You Remember Them):")
         for opponent in game.players:
             if opponent != current_player:
-                known_hand = current_player.get_known_opponent_hand(opponent)
+                known_hand = current_player.get_known_opponent_hand(opponent)  
                 print(f"{opponent.name}: {known_hand}")
 
         # **Show the player's own hand**
@@ -88,8 +88,8 @@ def run_multiplayer_client():
         client.connect((SERVER_HOST, SERVER_PORT))
 
         while True:
-            response = pickle.loads(client.recv(4096))
-            print(f"DEBUG: Client received: {response}")
+            response = pickle.loads(client.recv(4096))  
+            print(f"DEBUG: Client received: {response}")  
 
             if response.get("command") == "host_control":
                 print("\n🎮 You are the host! 🎮")
@@ -102,10 +102,12 @@ def run_multiplayer_client():
                     if start_game == "start":
                         client.sendall(pickle.dumps({"start_game": True}))
                         print("DEBUG: Host sent start command")
-                        break
+                        break  
+
+                continue  
 
             elif response.get("command") == "waiting":
-                print("\n🔄 Player list updated:")
+                print("\nWaiting for the host to start the game...")
                 print("Connected players:")
                 for player in response["players"]:
                     print(f"- {player}")
@@ -127,10 +129,8 @@ def play_multiplayer_game(client):
         try:
             response = client.recv(4096)
             game_state = pickle.loads(response)  
-
             print(f"DEBUG: Received game state: {game_state}")  
 
-            # ✅ Ensure game_state is a tuple
             if isinstance(game_state, tuple) and len(game_state) == 2:
                 game, player_name = game_state
             else:
