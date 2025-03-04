@@ -2,7 +2,7 @@ import numpy as np
 from collections import Counter
 from deck import Deck
 from player import Player
-import pickle
+
 class Game:
     def __init__(self, *players):
         self.deck = Deck()
@@ -53,76 +53,55 @@ class Game:
         """Returns a list of available actions for the current player."""
         return ["draw", "call_rats"]
 
-    def perform_action(self, player, action, client_socket=None, send_to_all=None):
-        """Performs the specified action for the current player and sends updates to clients if in multiplayer."""
-        print(f"Starting Perform action for {player.name}")
-
+    def perform_action(self, player, action):
+        """Performs the specified action for the current player."""
+        print(f"Starting Perform action")
+        
         if len(self.deck.cards) == 0:
-            message = "Deck is empty. Ending the game."
-            if client_socket:
-                client_socket.sendall(pickle.dumps({"command": "message", "data": message}))
-            else:
-                print(message)
+            print("Deck is empty. Ending the game.")
             self.end_game()
             return
 
         if self.rats_caller and self.players[self.turn].name == self.rats_caller:
-            message = f"{self.players[self.turn].name} has completed their final turn. Ending the game."
-            if client_socket:
-                client_socket.sendall(pickle.dumps({"command": "message", "data": message}))
-            else:
-                print(message)
+            print(f"{self.players[self.turn].name} has completed their final turn. Ending the game.")
             self.end_game()
             return
 
         if action == "draw":
-            self.draw_human(player, client_socket)
+            self.draw_human(player)
+            print(f"Ending Draw Phase")
 
         elif action == "call_rats":
             self.call_rats()
+        
+        self.advance_turn()
+        print(f"Ending Perform action")
 
-    # ✅ Notify all players that the turn has changed
-        self.advance_turn(client_socket, send_to_all)
-        print(f"Ending Perform action for {player.name}")
-
-    def draw_human(self, player, client_socket=None):
-        """Handles drawing a card for the player (single-player or multiplayer)."""
+    def draw_human(self, player):
+        """Handles drawing a card and replacing or discarding it."""
         drawn_card = self.deck.draw()
         if not drawn_card:
-            message = "Deck is empty. Cannot draw."
-            if client_socket:
-                client_socket.sendall(pickle.dumps({"command": "message", "data": message}))
-            else:
-                print(message)
+            print("Deck is empty. Cannot draw.")
             return
 
-        message = f"You drew: {drawn_card}"
-        if client_socket:
-            client_socket.sendall(pickle.dumps({"command": "message", "data": message}))  # ✅ Send draw message
-        else:
-            print(message)
+        print(f"You drew: {drawn_card}")
+        while True:
+            try:
+                replace_index = int(input("Choose which card to replace (0, 1, 2) or -1 to discard: "))
+                if replace_index == -1:
+                    self.handle_card_replacement(player, -1, drawn_card)
+                    break
+                elif 0 <= replace_index < len(player.cards):
+                    self.handle_card_replacement(player, replace_index, drawn_card)
+                    player.revealed_cards[replace_index] = True  # **Revealing the new card**
+                    break
+                else:
+                    print("Invalid choice. Please choose 0, 1, 2, or -1.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
 
-    # ✅ Multiplayer: Ask which card to replace
-        if client_socket:
-            client_socket.sendall(pickle.dumps({"command": "prompt", "data": "Choose which card to replace (0, 1, 2) or -1 to discard:"}))
-            response_data = client_socket.recv(4096)
-            replace_index = int(pickle.loads(response_data))
-        else:
-            replace_index = int(input("Choose which card to replace (0, 1, 2) or -1 to discard: "))
-
-    # ✅ Process choice
-        if replace_index == -1:
-            message = f"{player.name} discarded {drawn_card}."
-        elif 0 <= replace_index < len(player.cards):
-            message = f"{player.name} replaced card {replace_index} with {drawn_card}."
-            player.cards[replace_index] = drawn_card  # ✅ Perform card replacement
-        else:
-            message = "Invalid choice. Please choose 0, 1, 2, or -1."
+        print(f"Draw phase completed for {player.name}")
     
-        if client_socket:
-            client_socket.sendall(pickle.dumps({"command": "message", "data": message}))  # ✅ Confirm card replacement
-        else:
-            print(message)
 
     def swap_with_queen_human(self, player):
         """Handles swapping a card when a Queen is discarded while ensuring that knowledge remains player-specific."""
@@ -246,16 +225,19 @@ class Game:
         self.rats_caller = self.players[self.turn].name
         print(f"{self.players[(self.turn + 1) % len(self.players)].name} gets one final turn!")
 
-    def advance_turn(self, client_socket=None, send_to_all=None):
-        """Advances the turn to the next player and updates clients if in multiplayer."""
+    def advance_turn(self):
+        """Advances the turn to the next player, but ends the game if the 'Rats' caller's turn comes back."""
         self.turn = (self.turn + 1) % len(self.players)
-        message = f"Turn has advanced to: {self.players[self.turn].name}"
+        self.turn_counter += 1
 
-        if send_to_all:
-            send_to_all({"command": "message", "data": message})  # ✅ Notify all players
-        else:
-            print(message)
-            
+        if self.rats_called and self.players[self.turn].name == self.rats_caller:
+            print(f"{self.players[self.turn].name} has completed their final turn. Ending the game.")
+            self.end_game()
+            return  # Prevents any further actions
+
+        print(f"Turn counter incremented to {self.turn_counter}")
+        print(f"Turn has advanced to: {self.players[self.turn].name}")
+
     def end_game(self):
         """Handles scoring and ends the game."""
         scores = [player.get_total_score() for player in self.players]
