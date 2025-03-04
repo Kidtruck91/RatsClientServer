@@ -118,8 +118,9 @@ def start_game():
 
 def start_server():
     """Starts the server and waits for players to connect."""
+    
     global game
-
+    update_noip()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allows multiple connections on same machine
     server.bind((SERVER_HOST, SERVER_PORT))
