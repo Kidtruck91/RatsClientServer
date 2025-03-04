@@ -89,7 +89,7 @@ def handle_host(client_socket, player):
             response = pickle.loads(client_socket.recv(4096))
             print(f"DEBUG: Host response received: {response}")
 
-            if response.get("start_game"):
+            if response.get("start_game") and player.name == "Player 1":
                 print("DEBUG: Host started the game!")
                 send_to_all({"command": "start"})
                 start_game()
@@ -108,6 +108,9 @@ def start_game():
         return  # ✅ Prevent multiple game starts
     game = Game(*[p for _, p in clients])  # Use connected players
     print("🎮 Game is starting...")
+    print(f"DEBUG: Players in the game: {[p.name for _, p in clients]}")
+    print(f"DEBUG: Current Turn: {game.players[game.turn].name}")
+
 
     # Send start signal to all clients
     send_to_all({"command": "start"})
