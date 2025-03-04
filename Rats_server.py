@@ -1,159 +1,164 @@
 import socket
 import pickle
-import threading
-import requests
 from game_logic import Game, Player
-# No-IP Credentials
-NOIP_HOSTNAME = "ratsmpserver.ddns.net"  # Replace with your No-IP hostname
-NOIP_USERNAME = "2by66j9"
-NOIP_UPDATE_KEY = "Evhv3AVaYpLh"
 
-def update_noip():
-    """Updates No-IP with the server's current public IP."""
-    url = f"https://dynupdate.no-ip.com/nic/update?hostname={NOIP_HOSTNAME}"
-    response = requests.get(url, auth=(NOIP_USERNAME, NOIP_UPDATE_KEY))
-
-    if "good" in response.text or "nochg" in response.text:
-        print(f"✅ No-IP Updated Successfully: {response.text}")
-    else:
-        print(f"❌ No-IP Update Failed: {response.status_code} - {response.text}")
-
-def get_public_ip():
-    """Fetches the server's current public IP address."""
-    return requests.get("https://ifconfig.me/ip").text.strip()
-
-SERVER_HOST = "0.0.0.0"
+SERVER_HOST = "192.168.1.7"  # Replace with your actual local IP
 SERVER_PORT = 5555
 
-clients = []  # List of (socket, player_name) tuples
-game = None   # Global game instance
+def main():
+    """Game startup menu allowing choice between single-player, multiplayer, or exit."""
+    while True:
+        print("\nWelcome to Rats!")
+        print("1: Single Player")
+        print("2: Multiplayer")
+        print("3: Exit")
 
-def send_to_client(client_socket, message):
-    """Sends a pickled message to a client."""
-    try:
-        client_socket.sendall(pickle.dumps(message))
-    except Exception as e:
-        print(f"Error sending message to client: {e}")
+        choice = input("Enter your choice: ").strip()
 
-def send_to_all(message):
-    """Sends a pickled message to all clients and logs it."""
-    print(f"DEBUG: Sending to all clients: {message}")  # ✅ Debugging log
-    for client_socket, _ in clients:
+        if choice == "1":
+            num_players = get_player_count()
+            run_singleplayer_game(num_players)
+        elif choice == "2":
+            run_multiplayer_client()
+        elif choice == "3":
+            print("Exiting the game. Goodbye!")
+            break
+        else:
+            print("Invalid input. Please enter 1, 2, or 3.")
+
+def get_player_count():
+    """Get the number of players for single-player mode (2-4)."""
+    while True:
         try:
-            client_socket.sendall(pickle.dumps(message))
-        except Exception as e:
-            print(f"Error sending to client: {e}")
+            num_players = int(input("Enter the number of players (2-4): ").strip())
+            if 2 <= num_players <= 4:
+                return num_players
+            else:
+                print("Invalid number. Please enter a value between 2 and 4.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
 
+def run_singleplayer_game(num_players):
+    """Run Rats! in single-player mode (fully text-based)."""
+    print("\nStarting Single Player Mode...")
 
-def handle_client(client_socket, player):
-    """Handles communication with a single client after the game starts."""
-    global game
+    players = [Player(f"Player {i+1}", is_human=True) for i in range(num_players)]
+    game = Game(*players)
+
+    run_cli_game(game)
+
+def run_cli_game(game):
+    """Runs the game in command-line mode."""
+    print("\nWelcome to Rats! (CLI Mode)")
+
+    while not game.game_over:
+        current_player = game.players[game.turn]
+
+        print(f"\n{current_player.name}'s turn!")
+
+        # **Show opponent hands based on what the player knows**
+        print("\nOpponent Hands (As You Remember Them):")
+        for opponent in game.players:
+            if opponent != current_player:
+                known_hand = current_player.get_known_opponent_hand(opponent)  # Pass the opponent object
+                print(f"{opponent.name}: {known_hand}")
+
+        # **Show the player's own hand**
+        print(f"\nYour cards: {current_player.get_visible_cards(current_player.name)}")
+        print("Available actions:", ", ".join(game.get_available_actions()))
+
+        action = input("Choose an action: ").strip().lower()
+        if action in game.get_available_actions():
+            game.perform_action(current_player, action)
+        else:
+            print("Invalid action. Try again.")
+
+    print("\nGame Over!")
+    for player in game.players:
+        print(f"{player.name}: {player.get_total_score()} points")
+    winner = min(game.players, key=lambda p: p.get_total_score())
+    print(f"{winner.name} wins!")
+
+def run_multiplayer_client():
+    """Handles client-side multiplayer connection to the server."""
+    print("\nStarting Multiplayer Mode...")
 
     try:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect((SERVER_HOST, SERVER_PORT))
+
         while True:
-            # Send the game state to the client
-            game_state = pickle.dumps((game, player.name))
-            client_socket.sendall(game_state)
+            response = pickle.loads(client.recv(4096))  # ✅ Ensure full message is received
+            print(f"DEBUG: Client received: {response}")  # Debugging received data
 
-            # Receive the player's action
-            data = client_socket.recv(4096)
-            if not data:
-                break  # Exit loop if the client disconnects
+            if response.get("command") == "host_control":
+                print("\n🎮 You are the host! 🎮")
+                print("Connected players:")
+                for player in response["players"]:
+                    print(f"- {player}")
 
-            action = pickle.loads(data)
-            print(f"{player.name} chose action: {action}")
+                while True:
+                    start_game = input("Type 'start' to begin the game: ").strip().lower()
+                    if start_game == "start":
+                        client.sendall(pickle.dumps({"start_game": True}))
+                        print("DEBUG: Host sent start command")
+                        break  # ✅ Exit the loop after sending start command
 
-            # Perform the action if it's the player's turn
-            if game.players[game.turn] == player:
-                game.perform_action(player, action,client_socket, send_to_all)
+                # ✅ Prevent looping back into the host menu
+                continue
 
-                # Check if the game is over
-                if game.game_over:
-                    break
+            elif response.get("command") == "waiting":
+                print("\nWaiting for the host to start the game...")
+                print("Connected players:")
+                for player in response["players"]:
+                    print(f"- {player}")
 
-    except (ConnectionResetError, EOFError):
-        print(f"{player.name} disconnected unexpectedly.")
-    
+            elif response.get("command") == "start":
+                print("\n🎲 Game is starting!\n")
+                play_multiplayer_game(client)  # ✅ Transition into gameplay
+                return  # ✅ Prevent going back to the menu
+
+    except ConnectionRefusedError:
+        print("Could not connect to the server. Ensure the server is running.")
+
     finally:
-        client_socket.close()
+        client.close()
 
-def handle_host(client_socket, player):
-    """Handles the host before the game starts, ensuring they receive player updates."""
-    try:
-        while True:
-            # ✅ Send the current player list to the host
-            updated_players = {"command": "waiting", "players": [p.name for _, p in clients]}
-            send_to_client(client_socket, updated_players)
-            print(f"DEBUG: Sent player list update to host: {updated_players}")
+def play_multiplayer_game(client):
+    """Handles game communication after the game starts."""
+    while True:
+        try:
+            response = client.recv(4096)
+            game_state = pickle.loads(response)  # ✅ Ensure full game state is received
+            print(f"DEBUG: Received game state: {game_state}")  # ✅ Debugging received data
 
-            response = pickle.loads(client_socket.recv(4096))
-            print(f"DEBUG: Host response received: {response}")
+            # ✅ Ensure game_state is a tuple
+            if isinstance(game_state, tuple) and len(game_state) == 2:
+                game, player_name = game_state
+            else:
+                print("ERROR: Invalid game state received!")
+                continue  # Ignore bad data and wait for the next update
 
-            if response.get("start_game"):
-                print("DEBUG: Host started the game!")
-                start_game()
+            current_player = game.players[game.turn]
 
-                # ✅ Transition the host to normal gameplay (ensures they get updates)
-                handle_client(client_socket, player)
-                return  # ✅ Exit `handle_host()` after game starts
+            if current_player.name == player_name:
+                print(f"\nYour turn, {current_player.name}!")
+                print(f"Your cards: {current_player.get_visible_cards()}")  # Show only player's cards
+                print("Available actions:", ", ".join(game.get_available_actions()))
 
-    except Exception as e:
-        print(f"Host disconnected before starting: {e}")
+                action = input("Choose an action: ").strip().lower()
+                if action in game.get_available_actions():
+                    client.sendall(pickle.dumps(action))  # ✅ Send action to server
+                else:
+                    print("Invalid action. Try again.")
 
-def start_game():
-    """Initializes and starts the game with connected players."""
-    global game
-    if game:
-        print("⚠️ Game has already started! Ignoring extra start command.")
-        return  # ✅ Prevent multiple game starts
-    game = Game(*[p for _, p in clients])  # Use connected players
-    print("🎮 Game is starting...")
+            else:
+                print(f"\nWaiting for {current_player.name} to play...")
 
-    # Send start signal to all clients
-    send_to_all({"command": "start"})
-
-    # Start game communication threads
-    for client_socket, player in clients:
-        threading.Thread(target=handle_client, args=(client_socket, player)).start()
-
-def start_server():
-    """Starts the server and waits for players to connect."""
-    global game
-
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allows multiple connections on same machine
-    server.bind((SERVER_HOST, SERVER_PORT))
-    server.listen(4)
-
-    print("\n🚀 **Rats! Multiplayer Server is Running!** 🚀")
-    print(f"🎮 Host IP Address: {SERVER_HOST}")  # ✅ Displays local IP
-    print(f"🌐 Port: {SERVER_PORT}")
-    print("📢 Clients should enter this IP in `Rats_Client.py` to connect!\n")
-
-    print("Waiting for players to connect...")
-
-    while len(clients) < 4:  # Allow up to 4 players
-        client_socket, addr = server.accept()
-        player_id = len(clients) + 1
-        print(f"✅ Player {player_id} connected from {addr}")
-
-        new_player = Player(f"Player {player_id}", is_human=True)
-        clients.append((client_socket, new_player))
-
-        # ✅ Immediately send updated player list to ALL clients (including the host)
-        updated_players = {"command": "waiting", "players": [p.name for _, p in clients]}
-        send_to_all(updated_players)
-        print(f"DEBUG: Sent updated player list to all clients: {updated_players}")
-
-        # ✅ Assign the first player as the host
-        if len(clients) == 1:
-            print(f"👑 Player {player_id} is the host!")
-            send_to_client(client_socket, {"command": "host_control", "players": [p.name for _, p in clients]})
-            threading.Thread(target=handle_host, args=(client_socket, new_player)).start()
-
-        if len(clients) >= 2:
-            print("⏳ Waiting for host to start the game...")
+        except (ConnectionResetError, EOFError, pickle.UnpicklingError) as e:
+            print(f"Disconnected from the server. Error: {e}")
+            break
 
 
 if __name__ == "__main__":
-    start_server()
+    main()
