@@ -91,8 +91,8 @@ def handle_host(client_socket, player):
 
             if response.get("start_game"):
                 print("DEBUG: Host started the game!")
+                send_to_all({"command": "start"})
                 start_game()
-
                 # ✅ Transition the host to normal gameplay (ensures they get updates)
                 handle_client(client_socket, player)
                 return  # ✅ Exit `handle_host()` after game starts

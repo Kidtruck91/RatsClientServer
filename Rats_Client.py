@@ -129,26 +129,38 @@ def play_multiplayer_game(client):
     while True:
         try:
             response = client.recv(4096)
-            game_state = pickle.loads(response)  # ✅ Ensure full game state is received
-            print(f"DEBUG: Received game state: {game_state}")  # ✅ Debugging received data
+            game_state = pickle.loads(response)  
+            print(f"DEBUG: Received game state: {game_state}")  
 
-            # ✅ Ensure game_state is a tuple
+            # ✅ Handle messages separately
+            if isinstance(game_state, dict):
+                if game_state.get("command") == "message":
+                    print(game_state["data"])  # ✅ Display message to the player
+                    continue  # ✅ Skip normal game state processing
+                
+                elif game_state.get("command") == "prompt":
+                    print(game_state["data"])  # ✅ Show prompt message
+                    response = input(">>> ")  # ✅ Player provides input
+                    client.sendall(pickle.dumps(response))
+                    continue  # ✅ Skip normal game state processing
+
+            # ✅ Ensure game_state is a tuple for normal game updates
             if isinstance(game_state, tuple) and len(game_state) == 2:
                 game, player_name = game_state
             else:
                 print("ERROR: Invalid game state received!")
-                continue  # Ignore bad data and wait for the next update
+                continue  
 
             current_player = game.players[game.turn]
 
             if current_player.name == player_name:
                 print(f"\nYour turn, {current_player.name}!")
-                print(f"Your cards: {current_player.get_visible_cards()}")  # Show only player's cards
+                print(f"Your cards: {current_player.get_visible_cards()}")  
                 print("Available actions:", ", ".join(game.get_available_actions()))
 
                 action = input("Choose an action: ").strip().lower()
                 if action in game.get_available_actions():
-                    client.sendall(pickle.dumps(action))  # ✅ Send action to server
+                    client.sendall(pickle.dumps(action))  
                 else:
                     print("Invalid action. Try again.")
 
