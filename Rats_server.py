@@ -1,24 +1,31 @@
 import socket
 import pickle
 import threading
+import requests
 from game_logic import Game, Player
+# No-IP Credentials
+NOIP_HOSTNAME = "ratsmpserver.ddns.net"  # Replace with your No-IP hostname
+NOIP_USERNAME = "2by66j9"
+NOIP_UPDATE_KEY = "Evhv3AVaYpLh"
 
-def get_local_ip():
-    """Finds the local IP address of the server."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))  # Connects to a public server to determine local IP
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = "127.0.0.1"  # Fallback to localhost
-    finally:
-        s.close()
-    return local_ip
+def update_noip():
+    """Updates No-IP with the server's current public IP."""
+    url = f"https://dynupdate.no-ip.com/nic/update?hostname={NOIP_HOSTNAME}"
+    response = requests.get(url, auth=(NOIP_USERNAME, NOIP_UPDATE_KEY))
 
-SERVER_HOST = "0.0.0.0"#get_local_ip()  # Automatically detects and sets the local IP
+    if "good" in response.text or "nochg" in response.text:
+        print(f"✅ No-IP Updated Successfully: {response.text}")
+    else:
+        print(f"❌ No-IP Update Failed: {response.status_code} - {response.text}")
+
+def get_public_ip():
+    """Fetches the server's current public IP address."""
+    return requests.get("https://ifconfig.me/ip").text.strip()
+
+SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 5555
 
-clients = []  # List of (socket, player) tuples
+clients = []  # List of (socket, player_name) tuples
 game = None   # Global game instance
 
 def send_to_client(client_socket, message):
@@ -58,7 +65,7 @@ def handle_client(client_socket, player):
 
             # Perform the action if it's the player's turn
             if game.players[game.turn] == player:
-                game.perform_action(player, action)
+                game.perform_action(player, action,client_socket, send_to_all)
 
                 # Check if the game is over
                 if game.game_over:

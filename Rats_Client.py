@@ -2,7 +2,7 @@ import socket
 import pickle
 from game_logic import Game, Player
 
-SERVER_HOST = "192.168.1.7"  # Replace with your actual local IP
+SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with your actual local IP
 SERVER_PORT = 5555
 
 def main():
