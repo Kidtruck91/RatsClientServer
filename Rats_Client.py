@@ -1,10 +1,8 @@
 import socket
 import pickle
-import sys
-import threading
 from game_logic import Game, Player
 
-SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with your actual local IP
+SERVER_HOST = "192.168.1.7"  # Replace with your actual local IP
 SERVER_PORT = 5555
 
 def main():
@@ -89,22 +87,43 @@ def run_multiplayer_client():
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect((SERVER_HOST, SERVER_PORT))
 
-        # Start a separate thread to listen for server updates
-        threading.Thread(target=handle_server_messages, args=(client,), daemon=True).start()
-
-        # If this player is the host, allow them to start the game
-        print("\nType 'start' to begin the game (only for host).")
-        threading.Thread(target=handle_host_input, args=(client,)).start()
-
-        # Keep the main thread alive
         while True:
-            pass
+            response = pickle.loads(client.recv(4096))  # ✅ Ensure full message is received
+            print(f"DEBUG: Client received: {response}")  # Debugging received data
+
+            if response.get("command") == "host_control":
+                print("\n🎮 You are the host! 🎮")
+                print("Connected players:")
+                for player in response["players"]:
+                    print(f"- {player}")
+
+                while True:
+                    start_game = input("Type 'start' to begin the game: ").strip().lower()
+                    if start_game == "start":
+                        client.sendall(pickle.dumps({"start_game": True}))
+                        print("DEBUG: Host sent start command")
+                        break  # ✅ Exit the loop after sending start command
+
+                # ✅ Prevent looping back into the host menu
+                continue
+
+            elif response.get("command") == "waiting":
+                print("\nWaiting for the host to start the game...")
+                print("Connected players:")
+                for player in response["players"]:
+                    print(f"- {player}")
+
+            elif response.get("command") == "start":
+                print("\n🎲 Game is starting!\n")
+                play_multiplayer_game(client)  # ✅ Transition into gameplay
+                return  # ✅ Prevent going back to the menu
 
     except ConnectionRefusedError:
         print("Could not connect to the server. Ensure the server is running.")
 
     finally:
         client.close()
+
 def play_multiplayer_game(client):
     """Handles game communication after the game starts."""
     while True:
@@ -139,54 +158,7 @@ def play_multiplayer_game(client):
         except (ConnectionResetError, EOFError, pickle.UnpicklingError) as e:
             print(f"Disconnected from the server. Error: {e}")
             break
-def handle_server_messages(client):
-    """ Continuously receive updates from the server without blocking input. """
-    try:
-        while True:
-            game_state = client.recv(4096)  # Receive data from server
-            if not game_state:
-                print("Disconnected from the server.")
-                sys.exit(0)
 
-            try:
-                # Attempt to deserialize the data
-                game_data = pickle.loads(game_state)
-
-                # Check if it's the expected object
-                if isinstance(game_data, dict) and "command" in game_data:
-                    print(f"\nReceived command from server: {game_data['command']}")
-                    continue  # Skip processing if it's just a command message
-
-                game, player_id = game_data  # Unpack the tuple
-
-                print("\nUpdated Game State:")
-                for player in game.players:
-                    print(f"{player.name}: {player.get_visible_cards()}")
-
-                if game.players[game.turn].name == f"Player {player_id}":
-                    print(f"\nYour turn, {game.players[game.turn].name}!")
-                    print("Available actions:", ", ".join(game.get_available_actions()))
-                else:
-                    print(f"\nWaiting for {game.players[game.turn].name} to play...")
-
-            except pickle.UnpicklingError:
-                print("Error: Received data could not be unpickled. Possible corruption or incorrect format.")
-                print(f"Raw Data Received: {game_state}")
-
-    except (ConnectionResetError, EOFError):
-        print("Server disconnected.")
-        sys.exit(0)
-
-def handle_host_input(client):
-    """ Runs in a separate thread, allowing the host to start the game without blocking. """
-    while True:
-        command = input().strip().lower()
-        if command == "start":
-            client.sendall(pickle.dumps({"start_game": True}))
-            print("Game is starting...")
-            break  # Exit the input loop after starting
-        else:
-            print("Invalid command. Type 'start' to begin.")
 
 if __name__ == "__main__":
     main()
