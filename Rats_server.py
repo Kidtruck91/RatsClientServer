@@ -52,8 +52,14 @@ def handle_client(client_socket, player):
     try:
         while True:
             # Send the game state to the client
+            print(f"DEBUG: Sending game state to {player.name}")
+            print(f"DEBUG: Game turn = {game.players[game.turn].name}")
+            print(f"DEBUG: Player hands = {[p.get_visible_cards() for p in game.players]}")
+            print(f"DEBUG: Discard pile = {game.discard_pile}")
+
             game_state = pickle.dumps((game, player.name))
             client_socket.sendall(game_state)
+
 
             # Receive the player's action
             data = client_socket.recv(4096)
