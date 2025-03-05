@@ -48,7 +48,7 @@ def send_to_all(message):
 def handle_client(client_socket, player):
     """Handles communication with a single client after the game starts."""
     global game
-
+    print(f"DEBUG: handle_client started for {player.name}")
     try:
         while True:
             # Send the game state to the client
@@ -117,6 +117,7 @@ def start_game():
 
     # Start game communication threads
     for client_socket, player in clients:
+        print(f"DEBUG: Starting thread for {player.name}")
         threading.Thread(target=handle_client, args=(client_socket, player)).start()
 
 def start_server():

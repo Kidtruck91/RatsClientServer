@@ -94,7 +94,21 @@ def run_multiplayer_client():
 
         # If this player is the host, allow them to start the game
         print("\nType 'start' to begin the game (only for host).")
-        threading.Thread(target=handle_host_input, args=(client,)).start()
+        is_host = False  # Default to non-host
+
+        # Wait for initial message from server
+        game_state = client.recv(4096)
+        if game_state:
+            try:
+                game_data = pickle.loads(game_state)  # Ensure game_data is properly received
+                if isinstance(game_data, dict) and "host_control" in game_data.get("command", ""):
+                    is_host = True  # This client is the host
+            except pickle.UnpicklingError:
+                print("Error: Could not parse game data from server.")
+
+
+        threading.Thread(target=handle_host_input, args=(client, is_host)).start()
+
 
         # Keep the main thread alive
         while True:
@@ -170,7 +184,7 @@ def handle_server_messages(client):
                     continue  # Skip processing if it's just a command message
 
                 game, player_id = game_data  # Unpack the tuple
-
+                print(f"DEBUG: Player {player_id} received game state. Current turn: {game.players[game.turn].name}")
                 print("\nUpdated Game State:")
                 for player in game.players:
                     print(f"{player.name}: {player.get_visible_cards()}")
@@ -189,8 +203,10 @@ def handle_server_messages(client):
         print("Server disconnected.")
         sys.exit(0)
 
-def handle_host_input(client):
+def handle_host_input(client, is_host):
     """ Runs in a separate thread, allowing the host to start the game without blocking. """
+    if not is_host:
+        return
     while True:
         command = input().strip().lower()
         if command == "start":
