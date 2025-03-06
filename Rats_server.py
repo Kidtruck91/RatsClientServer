@@ -2,6 +2,7 @@ import socket
 import pickle
 import threading
 import requests
+import time
 from game_logic import Game, Player
 # No-IP Credentials
 NOIP_HOSTNAME = "ratsmpserver.ddns.net"  # Replace with your No-IP hostname
@@ -129,7 +130,7 @@ def start_game():
 
     # Send start signal to all clients
     send_to_all({"command": "start"})
-
+    time.sleep(5)
     # Start game communication threads
     for client_socket, player in clients:
         print(f"DEBUG: Starting thread for {player.name}")
