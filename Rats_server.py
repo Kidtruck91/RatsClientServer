@@ -110,7 +110,7 @@ def handle_host(client_socket, player):
                 send_to_all({"command": "start"})
                 start_game()
                 # ✅ Transition the host to normal gameplay (ensures they get updates)
-                handle_client(client_socket, player)
+               # handle_client(client_socket, player)
                 return  # ✅ Exit `handle_host()` after game starts
 
     except Exception as e:
