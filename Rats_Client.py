@@ -121,10 +121,12 @@ def run_multiplayer_client():
         client.close()
 def play_multiplayer_game(client):
     """Handles game communication after the game starts."""
+    print("DEBUG: Entered play_multiplayer_game() loop.") 
     while True:
         try:
             response = client.recv(4096)
             game_state = pickle.loads(response)  
+            print(f"DEBUG: Received raw game state from server -> {type(game_state)}: {game_state}")
             print(f"DEBUG: Received game state: {game_state}")  
 
             # ✅ Handle messages separately
@@ -140,10 +142,25 @@ def play_multiplayer_game(client):
                     continue  # ✅ Skip normal game state processing
 
             # ✅ Ensure game_state is a tuple for normal game updates
+            if isinstance(game_state, dict):
+                print(f"DEBUG: Received dict-based game state: {game_state}")
+                if game_state.get("command") == "start":
+                    print("DEBUG: Ignoring start command, waiting for game state...")
+                    continue  # Ignore "start" and wait for the actual game state
+                else:
+                    print(f"ERROR: Unexpected dictionary received: {game_state}")
+                    continue  # Ignore unknown messages
+
             if isinstance(game_state, tuple) and len(game_state) == 2:
                 game, player_name = game_state
+                print(f"DEBUG: Player {player_name} received game state.")
+                print(f"DEBUG: Current turn = {game.players[game.turn].name}")
+                print(f"DEBUG: Your hand = {game.players[int(player_name) - 1].get_visible_cards()}")
+                print(f"DEBUG: Known discard pile = {game.discard_pile}")
+
+
             else:
-                print("ERROR: Invalid game state received!")
+                print(f"ERROR: Invalid game state received! Raw data: {game_state}")
                 continue  
 
             current_player = game.players[game.turn]
@@ -181,6 +198,9 @@ def handle_server_messages(client):
                 # Check if it's the expected object
                 if isinstance(game_data, dict) and "command" in game_data:
                     print(f"\nReceived command from server: {game_data['command']}")
+                    if game_data["command"] == "start":
+                        print("DEBUG: Game started! Entering game loop...")
+                        threading.Thread(target=play_multiplayer_game, args=(client,)).start()
                     continue  # Skip processing if it's just a command message
 
                 game, player_id = game_data  # Unpack the tuple
@@ -217,7 +237,8 @@ def handle_host_input(client, is_host):
         if command == "start":
             client.sendall(pickle.dumps({"start_game": True}))
             print("Game is starting...")
-            break  # Exit the input loop after starting
+            threading.Thread(target=play_multiplayer_game, args=(client,)).start()
+            return  # Exit the input loop after starting
         else:
             print("Invalid command. Type 'start' to begin.")
 
