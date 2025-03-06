@@ -61,7 +61,12 @@ def handle_client(client_socket, player):
             print(f"DEBUG: Sending actual game state to {player.name} -> {type(game_state)}")
             print(f"DEBUG: Game object type: {type(game)}")
             print(f"DEBUG: Player name sent: {player.name}")
-            client_socket.sendall(pickle.dumps(game_state))
+            print(f"DEBUG: Sending actual game state to {player.name} -> {type(game_state)}")
+            try:
+                client_socket.sendall(pickle.dumps(game_state))
+                print(f"✅ SUCCESS: Game state sent to {player.name}")
+            except Exception as e:
+                print(f"❌ ERROR: Failed to send game state to {player.name}: {e}")
 
 
 

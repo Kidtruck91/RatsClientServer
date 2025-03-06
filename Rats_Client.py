@@ -119,14 +119,22 @@ def run_multiplayer_client():
 
     finally:
         client.close()
+import pickle
+
 def play_multiplayer_game(client):
     """Handles game communication after the game starts."""
     print("DEBUG: Entered play_multiplayer_game() loop.") 
+
     while True:
         try:
             response = client.recv(4096)
-            game_state = pickle.loads(response)  
-            print(f"DEBUG: Received raw game state from server -> {type(game_state)}: {game_state}")
+            try:
+                game_state = pickle.loads(response)
+                print(f"✅ SUCCESS: Received game state from server -> {type(game_state)}: {game_state}")
+            except Exception as e:
+                print(f"❌ ERROR: Failed to process game state: {e}")
+                continue  # Skip processing if unpickling fails
+
             print(f"DEBUG: Received game state: {game_state}")  
 
             # ✅ Handle messages separately
@@ -141,22 +149,27 @@ def play_multiplayer_game(client):
                     client.sendall(pickle.dumps(response))
                     continue  # ✅ Skip normal game state processing
 
-            # ✅ Ensure game_state is a tuple for normal game updates
-            if isinstance(game_state, dict):
+                # ✅ Ensure game_state is a tuple for normal game updates
                 print(f"DEBUG: Received dict-based game state: {game_state}")
                 if game_state.get("command") == "start":
                     print("DEBUG: Ignoring start command, waiting for game state...")
-                    continue  # Ignore "start" and wait for the actual game state
+
+                    # ✅ Explicitly wait for the next message (real game state)
+                    response = client.recv(4096)
+                    game_state = pickle.loads(response)
+                    print(f"✅ SUCCESS: Received next game state -> {type(game_state)}: {game_state}")
+
                 else:
                     print(f"ERROR: Unexpected dictionary received: {game_state}")
                     continue  # Ignore unknown messages
 
+            # ✅ Ensure game_state is correctly structured as a tuple
             if isinstance(game_state, tuple) and len(game_state) == 2:
                 game, player_name = game_state
                 print(f"DEBUG: Player {player_name} received game state.")
                 print(f"DEBUG: Current turn = {game.players[game.turn].name}")
     
-                # Find the matching player object in the game
+                # ✅ Find the matching player object in the game
                 player = next((p for p in game.players if p.name == player_name), None)
     
                 if player:
@@ -166,22 +179,22 @@ def play_multiplayer_game(client):
     
                 print(f"DEBUG: Known discard pile = {game.discard_pile}")
 
-
-
             else:
                 print(f"ERROR: Invalid game state received! Raw data: {game_state}")
                 continue  
 
             current_player = game.players[game.turn]
 
-            if player and current_player == player_name:
-                print(f"\nYour turn, {current_player.name}!")
-                print(f"Your cards: {current_player.get_visible_cards()}")  
+            # ✅ FIXED: Compare `current_player.name == player_name`
+            if player and current_player.name == player_name:
+                print(f"\n✅ SUCCESS: {current_player.name}, it's your turn!")
+                print(f"Your cards: {player.get_visible_cards()}")  
                 print("Available actions:", ", ".join(game.get_available_actions()))
 
                 action = input("Choose an action: ").strip().lower()
                 if action in game.get_available_actions():
                     client.sendall(pickle.dumps(action))  
+                    print(f"✅ SUCCESS: Sent action '{action}' to server.")
                 else:
                     print("Invalid action. Try again.")
 
