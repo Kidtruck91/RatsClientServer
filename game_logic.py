@@ -55,7 +55,7 @@ class Game:
 
     def perform_action(self, player, action, client_socket=None, send_to_all=None):
         """Performs the specified action for the current player and sends updates to clients if in multiplayer."""
-        print(f"Starting Perform action for {player.name}")
+        print(f"DEBUG: Performing action '{action}' for {player.name}")
 
         if len(self.deck.cards) == 0:
             message = "Deck is empty. Ending the game."
@@ -83,7 +83,7 @@ class Game:
 
     # ✅ Notify all players that the turn has changed
         self.advance_turn(client_socket, send_to_all)
-        print(f"Ending Perform action for {player.name}")
+        print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
 
     def draw_human(self, player, client_socket=None):
         """Handles drawing a card for the player (single-player or multiplayer)."""

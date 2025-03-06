@@ -184,7 +184,10 @@ def handle_server_messages(client):
                     continue  # Skip processing if it's just a command message
 
                 game, player_id = game_data  # Unpack the tuple
-                print(f"DEBUG: Player {player_id} received game state. Current turn: {game.players[game.turn].name}")
+                print(f"DEBUG: Player {player_id} received game state.")
+                print(f"DEBUG: Current turn = {game.players[game.turn].name}")
+                print(f"DEBUG: Your hand = {game.players[int(player_id) - 1].get_visible_cards()}")
+                print(f"DEBUG: Known discard pile = {game.discard_pile}")
                 print("\nUpdated Game State:")
                 for player in game.players:
                     print(f"{player.name}: {player.get_visible_cards()}")
@@ -192,8 +195,10 @@ def handle_server_messages(client):
                 if game.players[game.turn].name == f"Player {player_id}":
                     print(f"\nYour turn, {game.players[game.turn].name}!")
                     print("Available actions:", ", ".join(game.get_available_actions()))
-                else:
-                    print(f"\nWaiting for {game.players[game.turn].name} to play...")
+    
+                    action = input("Choose an action: ").strip().lower()
+                    client.sendall(pickle.dumps(action))
+                    print(f"DEBUG: Sent action '{action}' to server.")
 
             except pickle.UnpicklingError:
                 print("Error: Received data could not be unpickled. Possible corruption or incorrect format.")
