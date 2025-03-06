@@ -155,8 +155,17 @@ def play_multiplayer_game(client):
                 game, player_name = game_state
                 print(f"DEBUG: Player {player_name} received game state.")
                 print(f"DEBUG: Current turn = {game.players[game.turn].name}")
-                print(f"DEBUG: Your hand = {game.players[int(player_name) - 1].get_visible_cards()}")
+    
+                # Find the matching player object in the game
+                player = next((p for p in game.players if p.name == player_name), None)
+    
+                if player:
+                    print(f"DEBUG: Your hand = {player.get_visible_cards()}")
+                else:
+                    print(f"ERROR: Could not find player object for {player_name}!")
+    
                 print(f"DEBUG: Known discard pile = {game.discard_pile}")
+
 
 
             else:
@@ -165,7 +174,7 @@ def play_multiplayer_game(client):
 
             current_player = game.players[game.turn]
 
-            if current_player.name == player_name:
+            if player and current_player == player_name:
                 print(f"\nYour turn, {current_player.name}!")
                 print(f"Your cards: {current_player.get_visible_cards()}")  
                 print("Available actions:", ", ".join(game.get_available_actions()))
