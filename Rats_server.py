@@ -1,12 +1,16 @@
 import socket
 import threading
 import json
+import time
 from game_logic import Game, Player
-from server_utils import start_game
-from network_utils import clients,players, SERVER_HOST,SERVER_PORT, send_json, receive_json,send_to_all,send_to_client
+from server_utils import start_game, accept_new_players
+from network_utils import clients, players, SERVER_HOST, SERVER_PORT, receive_message, send_json, receive_json, send_to_all, send_to_client
+
 def start_server():
     """Starts the server and waits for players to connect."""
     global players, clients
+    print("[DEBUG] Entering start_server()")
+
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((SERVER_HOST, SERVER_PORT))
@@ -17,44 +21,35 @@ def start_server():
     print("📢 Waiting for players to connect...\n")
 
     try:
-        while len(players) < 4:  # Allow up to 4 players
-            try:
-                client_socket, addr = server.accept()
-                print(f"[DEBUG] New connection from {addr}")
+        # ✅ Fix: Pass `send_json` when calling `accept_new_players`
+        print("[DEBUG] Starting accept_new_players thread...")
+        threading.Thread(target=accept_new_players, args=(server, players, clients, send_to_all, send_json), daemon=True).start()
 
-                player_id = len(players) + 1
-                new_player = Player(f"Player {player_id}")
-                players.append(new_player)
-                clients.append((client_socket, new_player))
+        # ✅ Ensure at least 2 players before waiting for start
+        while len(players) < 2:
+            print(f"[DEBUG] Waiting for players to join... (Current: {len(players)})")
+            time.sleep(1)  # ✅ Prevents infinite loop from blocking execution
 
-                # Notify all players of the updated list
-                send_to_all({"command": "waiting", "players": [p.name for p in players]})
+        print("[DEBUG] Finished player connection loop, waiting for host input...")
 
-                print(f"[DEBUG] Current connected players: {[p.name for p in players]}")
-
-                if len(players) == 1:
-                    print(f"[DEBUG] Player {player_id} is the host.")
-                    send_json(client_socket, {"command": "host_control", "players": [p.name for p in players]})
-
-                if len(players) >= 2:
-                    print("[DEBUG] Waiting for the host to start the game...")
-
-            except Exception as e:
-                print(f"[ERROR] Failed to accept new connection: {e}")
-
-        # Wait for host input to start game
+        # ✅ Wait for host input to start the game
         while True:
             if len(clients) > 0:  # ✅ Ensure clients exist before accessing
                 try:
                     print("[DEBUG] Waiting for host to start the game...")
-                    game_start_msg = receive_json(clients[0][0])  # Host input
+                    game_start_msg = receive_message(clients[0][0])  # ✅ Host input
 
-                    print(f"[DEBUG] Received message: {game_start_msg}")  # ✅ Debugging received data
+                    print(f"[DEBUG] Received message from host: {game_start_msg}")  # ✅ Debugging received data
 
-                    if game_start_msg and game_start_msg.get("command") == "start_game":
+                    if isinstance(game_start_msg, dict) and game_start_msg.get("command") == "start_game":
                         print("[DEBUG] Received 'start_game' command from host. Starting game...")
                         start_game()
                         break
+                    elif isinstance(game_start_msg, str) and game_start_msg.strip().lower() == "start_game":
+                        print("[DEBUG] Received 'start_game' as raw text. Starting game...")
+                        start_game()
+                        break
+
                 except Exception as e:
                     print(f"[ERROR] Failed to receive start command: {e}")
 
@@ -62,8 +57,8 @@ def start_server():
         print("[INFO] Server shutting down...")
         server.close()
 
-
 if __name__ == "__main__":
+    print("[DEBUG] Running Rats server...")  # ✅ Ensure this appears in logs
     try:
         start_server()
     except Exception as e:

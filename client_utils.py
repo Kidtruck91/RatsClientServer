@@ -1,26 +1,38 @@
 import threading
 import socket
+import time
 import json
 import sys
-from network_utils import send_json, receive_json
+from network_utils import send_json, receive_json,send_to_server
 from game_logic import Game, Player,Deck
 SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with actual server IP
 SERVER_PORT = 5555
 
-def handle_host_input(client, is_host):
-    """Allows the host to start the game when ready."""
+def handle_host_input(client):
+    """Allows the host to start the game when ready, but only if there are at least 2 players."""
     print("[DEBUG] Entering handle_host_input")
-    print("[DEBUG] Host is now able to start the game. Waiting for input...")
-
+    
     while True:
-        command = input("Type 'start' to begin the game: ").strip().lower()
+        print("Type 'start' to begin the game (minimum 2 players required).")
+        
+        # ✅ Check the number of players before allowing "start"
+        game_state = receive_json(client)
+        if game_state.get("command") == "waiting":
+            players = game_state.get("players", [])
+            print(f"[DEBUG] Current players: {players}")
+
+            if len(players) < 2:
+                print("[ERROR] At least 2 players are required to start the game.")
+                time.sleep(2)  # ✅ Prevent spam, wait before checking again
+                continue  # ✅ Keep checking until enough players join
+
+        command = input(">> ").strip().lower()
         if command == "start":
-            send_json(client, {"command": "start_game"})
+            send_to_server(client, {"command": "start_game"})
             print("[DEBUG] Sent start command to server.")
-            break  # ✅ Exit loop after sending start signal
-        else:
-            print("[ERROR] Invalid command. Type 'start' to begin the game.")
-    print("[DEBUG] Exiting handle_host_input")
+            break  # ✅ Prevents infinite loop
+
+        print("[ERROR] Invalid command. Type 'start' to begin the game.")
 
 
 def get_player_count():
@@ -41,16 +53,42 @@ def handle_server_messages(client):
         while True:
             try:
                 game_state = receive_json(client)
+                print(f"[DEBUG] Received message from server: {game_state}")  # ✅ Debugging received data
+
                 if not game_state:
                     print("[ERROR] Server closed the connection. Exiting...")
                     sys.exit(0)
 
+                # ✅ Handle "waiting" message correctly
+                if game_state.get("command") == "waiting":
+                    print("[DEBUG] Server says waiting for more players...")
+                    continue  # ✅ Stay connected and wait for the next update
+
+                # ✅ Handle "host_control" message correctly
+                if game_state.get("command") == "host_control":
+                    print("[DEBUG] You are the host! Waiting for your input...")
+                    print("Type 'start' to begin the game.")
+
+                    # ✅ CALL handle_host_input(client) so the host can type
+                    handle_host_input(client)  
+                    continue  # ✅ Stay connected
+                if game_state.get("command") == "prompt":
+                    print(game_state["data"])  # ✅ Display the prompt message
+                    player_input = input(">> ").strip()
+                    send_json(client, {"command": "response", "data": player_input})
+                    continue  # ✅ Stay connected
+                if game_state.get("command") == "game_state":
+                    if "player_name" not in game_state:
+                        print(f"[ERROR] Missing 'player_name' in game state! Data: {game_state}")
+
+                    print(f"[DEBUG] Game state received: {game_state}")
+                # ✅ Handle "start" message correctly
                 if game_state.get("command") == "start":
                     print("[DEBUG] Game started! Entering game loop...")
                     play_multiplayer_game(client)
-                    break  # Exit the loop after game starts
+                    break  # ✅ Exit the loop after game starts
 
-                print("[UPDATE] Game State:", game_state)
+                print("[UPDATE] Game State:", game_state)  # ✅ Debugging all other messages
             
             except ConnectionAbortedError:
                 print("[ERROR] Connection was aborted. Server may have closed the connection.")
@@ -62,9 +100,12 @@ def handle_server_messages(client):
 
             except Exception as e:
                 print(f"[ERROR] Unexpected issue in server communication: {e}")
+
     except (EOFError, SystemExit):
         print("[EXIT] handle_server_messages - Exiting due to connection loss.")
     print("[DEBUG] Exiting handle_server_messages")
+
+
 
 def run_singleplayer_game(num_players):
     """Run Rats! in single-player mode (fully text-based)."""
@@ -142,21 +183,32 @@ def run_multiplayer_client():
         client.connect((SERVER_HOST, SERVER_PORT))
         print("[DEBUG] Connected to server.")
 
+        # ✅ Start listening for server messages in a separate thread
         threading.Thread(target=handle_server_messages, args=(client,), daemon=True).start()
 
         game_state = receive_json(client)
         if game_state and game_state.get("command") == "host_control":
-            print("[DEBUG] This player is the host.")
-            handle_host_input(client)  # ✅ Direct call to ensure input happens before proceeding
+            print("[DEBUG] You are the host!")
+            
+            print("[DEBUG] Starting handle_host_input thread...")
+            # ✅ Start a separate thread for host input so it doesn’t block
+            threading.Thread(target=handle_host_input, args=(client,), daemon=True).start()
+
         else:
             print("[DEBUG] Waiting for the host to start the game...")
+
+        # ✅ Keep the main thread alive so the client doesn’t exit immediately
+        while True:
+            pass  
 
     except ConnectionRefusedError:
         print("[ERROR] Could not connect to the server. Ensure the server is running.")
     
     finally:
+        print("[DEBUG] Closing client socket...")
         client.close()
     print("[DEBUG] Exiting run_multiplayer_client")
+
 
 def play_multiplayer_game(client):
     """Handles game communication after the game starts."""
