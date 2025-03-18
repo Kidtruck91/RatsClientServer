@@ -34,14 +34,26 @@ class Player:
         return [
             self.cards[i] if self.revealed_cards[i] or viewer_name in self.card_known_by[i] else "?"
             for i in range(3)
-    ]
+        ]
     def get_known_opponent_hand(self, opponent):
         """Returns a representation of an opponent's hand using only the player's known information."""
         return [
             opponent.cards[i] if self.name in opponent.card_known_by[i] else "?"
             for i in range(3)
-    ]
+        ]
     def forget_opponent_card(self, opponent_name, index):
         """Removes an opponent's card from memory when they replace it with a new drawn card."""
-        if opponent_name in self.card_known_by[index]:
+        if self.card_known_by.get(index) and opponent_name in self.card_known_by[index]:
             del self.card_known_by[index][opponent_name]
+    def get_total_score(self):
+        """Calculates the total score for the player's hand."""
+        score = 0
+        for card in self.cards:
+            value, suit = card  # Extract numeric value
+            if value == 13:  # King is worth 0 points
+                score += 0
+            elif value in [11, 12]:  # Jacks and Queens are worth 10 points
+                score += 10
+            else:
+                score += value  # Aces count as 1, all other numbers use their value
+        return score
