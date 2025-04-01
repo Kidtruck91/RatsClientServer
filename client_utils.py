@@ -34,7 +34,16 @@ def handle_host_input(client):
 
         print("[ERROR] Invalid command. Type 'start' to begin the game.")
 
-
+def parse_card_string(card_str):
+    """Parses a string like '(11, 2)' into a tuple (11, 2), or returns '?'."""
+    if card_str == "?":
+        return "?"
+    try:
+        value, suit = card_str.strip("()").split(",")
+        return int(value), int(suit)
+    except Exception as e:
+        print(f"[ERROR] Failed to parse card string: {card_str} -> {e}")
+        return "?"
 def get_player_count():
     """Get the number of players for single-player mode (2-4)."""
     while True:
@@ -53,49 +62,70 @@ def handle_server_messages(client):
         while True:
             try:
                 game_state = receive_json(client)
-                print(f"[DEBUG] Received message from server: {game_state}")  # ✅ Debugging received data
+                print(f"[DEBUG] Received message from server: {game_state}")
 
                 if not game_state:
                     print("[ERROR] Server closed the connection. Exiting...")
                     sys.exit(0)
 
-                # ✅ Handle "waiting" message correctly
-                if game_state.get("command") == "waiting":
-                    print("[DEBUG] Server says waiting for more players...")
-                    continue  # ✅ Stay connected and wait for the next update
+                match game_state.get("command"):
+                    case "waiting":
+                        print("[DEBUG] Server says waiting for more players...")
 
-                # ✅ Handle "host_control" message correctly
-                if game_state.get("command") == "host_control":
-                    print("[DEBUG] You are the host! Waiting for your input...")
-                    print("Type 'start' to begin the game.")
+                    case "host_control":
+                        print("[DEBUG] You are the host! Waiting for your input...")
+                        print("Type 'start' to begin the game.")
+                        handle_host_input(client)
 
-                    # ✅ CALL handle_host_input(client) so the host can type
-                    handle_host_input(client)  
-                    continue  # ✅ Stay connected
-                if game_state.get("command") == "prompt":
-                    print(game_state["data"])  # ✅ Display the prompt message
-                    player_input = input(">> ").strip()
-                    send_json(client, {"command": "response", "data": player_input})
-                    continue  # ✅ Stay connected
-                if game_state.get("command") == "game_state":
-                    if "player_name" not in game_state:
-                        print(f"[ERROR] Missing 'player_name' in game state! Data: {game_state}")
+                    case "start":
+                        print("[DEBUG] Game started! Entering game loop...")
+                        play_multiplayer_game(client)
+                        break
 
-                    print(f"[DEBUG] Game state received: {game_state}")
-                # ✅ Handle "start" message correctly
-                if game_state.get("command") == "start":
-                    print("[DEBUG] Game started! Entering game loop...")
-                    play_multiplayer_game(client)
-                    break  # ✅ Exit the loop after game starts
+                    case "your_turn":
+                        print("[DEBUG] Received your_turn signal (turn confirmed)")
 
-                print("[UPDATE] Game State:", game_state)  # ✅ Debugging all other messages
-            
-            except ConnectionAbortedError:
-                print("[ERROR] Connection was aborted. Server may have closed the connection.")
-                sys.exit(0)
+                    case "tell":
+                        print(f"[INFO] {game_state.get('message')}")
 
-            except ConnectionResetError:
-                print("[ERROR] Connection reset by server.")
+                    case "message":
+                        print(f"[UPDATE] {game_state.get('data')}")
+
+                    case "prompt":
+                        prompt_type = game_state.get("type", "generic")
+                        message = game_state.get("data", "Enter your choice:")
+                        print(message)
+                        player_input = input(">> ").strip()
+                        send_json(client, {
+                            "command": "response",
+                            "type": prompt_type,
+                            "data": player_input
+                        })
+
+                    case "game_state":
+                        player_name = game_state.get("player_name")
+                        current_turn = game_state.get("turn")
+                        if player_name and current_turn:
+                            if current_turn == player_name:
+                                print(f"[DEBUG] {player_name}, it's your turn!")
+
+                                readable_cards = [
+                                    "?" if card == "?" else Deck.card_to_string(parse_card_string(card))
+                                    for card in game_state.get("your_cards", [])
+                                ]
+                                print(f"\nYour cards: {readable_cards}")
+                                print(f"Available actions: {', '.join(game_state.get('actions', []))}")
+                                action = input("Choose an action: ").strip()
+                                send_json(client, {"command": "action", "data": action})
+                            else:
+                                print(f"[DEBUG] Waiting for {current_turn} to play...")
+
+                    case _:
+                        print("[WARNING] Unknown command received.")
+                        print("[UPDATE] Game State:", game_state)
+
+            except (ConnectionAbortedError, ConnectionResetError):
+                print("[ERROR] Connection lost with server.")
                 sys.exit(0)
 
             except Exception as e:
@@ -104,6 +134,7 @@ def handle_server_messages(client):
     except (EOFError, SystemExit):
         print("[EXIT] handle_server_messages - Exiting due to connection loss.")
     print("[DEBUG] Exiting handle_server_messages")
+
 
 
 
@@ -130,7 +161,10 @@ def run_cli_game(game):
         for opponent in game.players:
             if opponent != current_player:
                 known_hand = current_player.get_known_opponent_hand(opponent)
-                print(f"{opponent.name}: {known_hand}")
+                readable_known_hand = [
+                    Deck.card_to_string(card) if isinstance(card, tuple) else "?"
+                    for card in known_hand]
+                print(f"{opponent.name}: {readable_known_hand}")
 
         # Show the player's own hand
         print(f"\nYour cards: {[Deck.card_to_string(card) for card in current_player.get_visible_cards(current_player.name)]}")
@@ -228,7 +262,9 @@ def play_multiplayer_game(client):
 
         if current_player == player_name:
             print(f"[DEBUG] {player_name}, it's your turn!")
-            print(f"Your cards: {game_state['your_cards']}")
+            readable_cards = ["?" if card == "?" else Deck.card_to_string(parse_card_string(card))
+                for card in game_state["your_cards"]]
+            print(f"\nYour cards: {readable_cards}")
             print("Available actions:", ", ".join(game_state["actions"]))
 
             action = input("Choose an action: ").strip().lower()

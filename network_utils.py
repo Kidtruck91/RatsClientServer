@@ -5,6 +5,7 @@ SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 5555
 clients = []
 players = []
+client_socket_lookup = {}
 def send_json(client_socket, data):
     """Encodes and sends JSON data over a socket."""
     try:
@@ -80,7 +81,13 @@ def send_to_server(client_socket, message):
             print(f"[DEBUG] Sent raw message to server: {message}")  # ✅ Debug sent raw text
     except Exception as e:
         print(f"[ERROR] Failed to send to server: {e}")
-
+def send_to_player(player_name, message):
+    """Sends a JSON message to a player by their name."""
+    client_socket = client_socket_lookup.get(player_name)
+    if client_socket:
+        send_to_client(client_socket, message)
+    else:
+        print(f"[ERROR] No client socket found for player: {player_name}")
 def send_to_client(client_socket, message):
     """Sends a JSON message to a specific client."""
     try:

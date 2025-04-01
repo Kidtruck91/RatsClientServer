@@ -19,6 +19,7 @@ class Game:
         self.turn_counter = 0
         self.last_discard = None
         self.special_action_available = False
+        self.pending_prompts = {} 
 
         #   If this is a fresh game (not a clone), create a deck and deal cards
         if not discard_pile and not draw_pile:
@@ -105,13 +106,28 @@ class Game:
             return
 
         if action == "draw":
-            print(f"DEBUG: {player.name} chose to draw.")
-            drawn_card,replace_index = self.draw_human(player, client_socket)  #   Draw card first
+            drawn_card, tell_msg, prompt_msg = self.draw_human(player, client_socket)
+
             if drawn_card is None:
-                print("DEBUG: Exiting perform_action() because draw_human() returned None.")
                 return
-            print(f"DEBUG: Calling handle_card_replacement() for {player.name}. Index: {replace_index}, New Card: {drawn_card}")
-            self.handle_card_replacement(player, replace_index, drawn_card)
+
+            if client_socket:
+                # Queue these messages and wait for response in handle_client
+                send_json(client_socket, tell_msg)
+                send_json(client_socket, prompt_msg)
+
+                # Store this pending prompt context somewhere (example below)
+                self.pending_prompts[player.name] = {
+                    "type": "card_replacement",
+                    "card": drawn_card,
+                }
+
+                return  # Wait for handle_client() to finish on response
+
+            else:
+                # Single-player: already handled
+                self.handle_card_replacement(player, prompt_msg, drawn_card)
+
 
         elif action == "call_rats":
             self.call_rats()
@@ -121,27 +137,30 @@ class Game:
         print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
 
     def draw_human(self, player, client_socket=None):
-        """Handles drawing a card for the player (single-player or multiplayer)."""
+        """Draws a card and returns a prompt context for replacement (multiplayer safe)."""
         if not self.draw_pile:
             print(f"{player.name} attempted to draw, but the deck is empty!")
-            return None, -1
+            return None, None, None
 
         drawn_card = self.draw_pile.pop()
-        print(f"{player.name} drew a {Deck.card_to_string(drawn_card)}")
-
-        # ✅ Notify the player privately
-        if client_socket:
-            send_to_client(client_socket, {"command": "draw_card", "message": f"You drew a {Deck.card_to_string(drawn_card)}"})
+        card_str = Deck.card_to_string(drawn_card)
+        print(f"{player.name} drew a {card_str}")
 
         if client_socket:
-            send_json(client_socket, {"command": "prompt", "data": "Choose which card to replace (0, 1, 2) or -1 to discard:"})
-            response_data = receive_json(client_socket)
-            replace_index = int(response_data)
+            # Do not block for input — just return prompt context
+            tell_message = {"command": "tell", "message": f"You drew a {card_str}"}
+            prompt_message = {
+                "command": "prompt",
+                "type": "card_replacement",
+                "data": "Choose which card to replace (0, 1, 2) or -1 to discard:",
+                "card_drawn": str(drawn_card),  # Optional: for logging/debug
+            }
+            return drawn_card, tell_message, prompt_message
         else:
+            # Single-player fallback
             replace_index = int(input("Choose which card to replace (0, 1, 2) or -1 to discard: "))
-
-        return drawn_card, replace_index
-
+            return drawn_card, None, replace_index
+    
     def swap_with_queen_human(self, player):
         """Handles swapping a card when a Queen is discarded while ensuring that knowledge remains player-specific."""
         print("\nChoose an opponent to swap with:")
@@ -203,77 +222,67 @@ class Game:
         print(f"{player.name} swapped a card with {opponent.name}. Only logical knowledge is transferred.")
 
 
-    def ask_peek_choice(self, player):
-        """Allows the player to choose whether to peek at their own card or an opponent's."""
-        while True:
-            print("Do you want to:")
-            print("1: Peek at one of your own cards")
-            print("2: Peek at one of your opponent's cards")
-
-            choice = input("Enter 1 or 2: ").strip()
-            if choice == "1":
-                self.peek_self(player)
-                break
-            elif choice == "2":
-                self.peek_opponent(player)
-                break
-            else:
-                print("Invalid choice. Please enter 1 or 2.")
-
-    def peek_opponent(self, player):
-        """Allows the player to peek at an opponent's card and remember it."""
-        print("\nChoose an opponent to peek at:")
-        opponents = [opponent for opponent in self.players if opponent != player]
-
-        for i, opponent in enumerate(opponents):
-            print(f"{i}: {opponent.name}")
-
-        while True:
-            try:
-                opp_index = int(input("Enter the number of the opponent to peek at: "))
-                if 0 <= opp_index < len(opponents):
-                    opponent = opponents[opp_index]
+    def ask_peek_choice(self, player, client_socket=None):
+        """Prompt player to choose peek type when discarding a Jack."""
+        if client_socket:
+            send_json(client_socket, {
+                "command": "prompt",
+                "type": "jack_peek_choice",
+                "data": "Peek at your own card (1) or opponent’s card (2)?"
+            })
+            self.pending_prompts[player.name] = {
+                "type": "jack_peek_choice"
+            }
+        else:
+            # Single-player fallback
+            while True:
+                choice = input("Enter 1 to peek at your own card or 2 to peek at an opponent’s card: ").strip()
+                if choice == "1":
+                    self.peek_self(player)
+                    break
+                elif choice == "2":
+                    self.peek_opponent(player)
                     break
                 else:
-                    print("Invalid choice. Choose a valid opponent.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
+                    print("Invalid input.")
 
-        print(f"{opponent.name}'s cards (as you remember them):")
-        for i in range(3):
-            display_value = opponent.cards[i] if player.name in opponent.card_known_by[i] else "?"
-            print(f"{i}: {display_value}")  # **Show known cards, hide unknown ones**
+    def peek_opponent(self, player, client_socket=None):
+        opponents = [op for op in self.players if op != player]
+        if client_socket:
+            opponent_list = {str(i): op.name for i, op in enumerate(opponents)}
+            send_json(client_socket, {
+                "command": "prompt",
+                "type": "peek_opponent_select",
+                "data": f"Choose opponent to peek at: {opponent_list}"
+            })
+            self.pending_prompts[player.name] = {
+                "type": "peek_opponent_select",
+                "options": opponent_list,
+                "opponents": opponents
+            }
+        else:
+            # Fallback for local
+            index = int(input("Select opponent: "))
+            target = opponents[index]
+            peek_index = int(input("Which card to peek at (0–2)? "))
+            player.add_known_opponent_card(target.name, peek_index, target.cards[peek_index])
+            print(f"You peeked at {target.name}'s card: {Deck.card_to_string(target.cards[peek_index])}")
 
-        while True:
-            try:
-                peek_index = int(input(f"Choose an opponent's card to peek at (0, 1, or 2): "))
-                if 0 <= peek_index < len(opponent.cards):
-                    print(f"You peeked at {opponent.name}'s card at {peek_index} : {opponent.cards[peek_index]}")
-                    opponent.reveal_card_to(peek_index, player.name)  # Player now knows this card
-                    break
-                else:
-                    print("Invalid choice. Choose 0, 1, or 2.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-
-    def peek_self(self, player):
-        """Allows a player to peek at one of their own cards."""
-        print("\nChoose a card to peek at:")
-        for i, card in enumerate(player.cards):
-            display_value = Deck.card_to_string(card) if player.revealed_cards[i] else "?"
-            print(f"{i}: {display_value}")  # Player only sees their known cards
-
-        while True:
-            try:
-                peek_index = int(input("Enter the index of the card to peek at (0, 1, or 2): "))
-                if 0 <= peek_index < len(player.cards):
-                    print(f"You peeked at your card at index {peek_index}: {Deck.card_to_string(player.cards[peek_index])}")
-                    player.revealed_cards[peek_index] = True  # ✅ Mark the card as revealed
-                    break
-                else:
-                    print("Invalid choice. Choose 0, 1, or 2.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
+    def peek_self(self, player, client_socket=None):
+        if client_socket:
+            send_json(client_socket, {
+                "command": "prompt",
+                "type": "peek_self_index",
+                "data": "Choose a card to peek at (0, 1, 2):"
+            })
+            self.pending_prompts[player.name] = {
+                "type": "peek_self_index"
+            }
+        else:
+            index = int(input("Which card to peek at? (0–2): "))
+            card = player.cards[index]
+            player.revealed_cards[index] = True
+            print(f"You peeked at your card: {Deck.card_to_string(card)}")
                 
     def call_rats(self, client_socket=None, send_to_all=None):
         """Handles the 'Rats' call and sets up the final turn."""
@@ -291,20 +300,10 @@ class Game:
 
         print(f"{next_player.name} gets one final turn!")
 
-    def advance_turn(self, client_socket=None, send_to_all=None):
+    def advance_turn(self):
         """Advances the turn to the next player and updates clients if in multiplayer."""
         self.turn = (self.turn + 1) % len(self.players)
-        current_player = self.players[self.turn]
-        message = f"Turn has advanced to: {current_player.name}"
-
-        if send_to_all:
-            send_to_all({"command": "message", "data": message})  # ✅ Notify all players
-        else:
-            print(message)
-
-        # ✅ Send a private notification to the current player
-        if client_socket:
-            send_to_client(client_socket, {"command": "your_turn", "message": "It's your turn!"})
+        
             
     def end_game(self):
         """Handles scoring and ends the game."""
