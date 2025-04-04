@@ -3,8 +3,8 @@ import sys
 
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 5555
-clients = []
-players = []
+connected_clients = []
+connected_players = []
 client_socket_lookup = {}
 def send_json(client_socket, data):
     """Encodes and sends JSON data over a socket."""
@@ -98,12 +98,12 @@ def send_to_client(client_socket, message):
         print(f"[ERROR] Failed to send to client: {e}")
 def send_to_all(message):
     """Sends a JSON message to all connected clients."""
-    global clients
+    global connected_clients
     if not message:
         print("[ERROR] send_to_all() was called without a message!")
         return
     print(f"[DEBUG] send_to_all() called with: {message}")
-    for client_socket, _ in clients:
+    for client_socket, _ in connected_clients:
         try:
             send_json(client_socket, message)  # ✅ Uses send_json() for consistency
         except Exception as e:

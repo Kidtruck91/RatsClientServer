@@ -4,11 +4,11 @@ import json
 import time
 from game_logic import Game, Player
 from server_utils import start_game, accept_new_players
-from network_utils import clients, players, SERVER_HOST, SERVER_PORT, receive_message, send_json, receive_json, send_to_all, send_to_client
+from network_utils import connected_clients, connected_players, SERVER_HOST, SERVER_PORT, receive_message, send_json, receive_json, send_to_all, send_to_client
 
 def start_server():
     """Starts the server and waits for players to connect."""
-    global players, clients
+    global connected_players, connected_clients
     print("[DEBUG] Entering start_server()")
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,21 +23,21 @@ def start_server():
     try:
         # ✅ Fix: Pass `send_json` when calling `accept_new_players`
         print("[DEBUG] Starting accept_new_players thread...")
-        threading.Thread(target=accept_new_players, args=(server, players, clients, send_to_all, send_json), daemon=True).start()
+        threading.Thread(target=accept_new_players, args=(server, send_to_all, send_json), daemon=True).start()
 
         # ✅ Ensure at least 2 players before waiting for start
-        while len(players) < 2:
-            print(f"[DEBUG] Waiting for players to join... (Current: {len(players)})")
+        while len(connected_players) < 2:
+            print(f"[DEBUG] Waiting for players to join... (Current: {len(connected_players)})")
             time.sleep(1)  # ✅ Prevents infinite loop from blocking execution
 
         print("[DEBUG] Finished player connection loop, waiting for host input...")
 
         # ✅ Wait for host input to start the game
         while True:
-            if len(clients) > 0:  # ✅ Ensure clients exist before accessing
+            if len(connected_clients) > 0:  # ✅ Ensure clients exist before accessing
                 try:
                     print("[DEBUG] Waiting for host to start the game...")
-                    game_start_msg = receive_message(clients[0][0])  # ✅ Host input
+                    game_start_msg = receive_message(connected_clients[0][0])  # ✅ Host input
 
                     print(f"[DEBUG] Received message from host: {game_start_msg}")  # ✅ Debugging received data
 
