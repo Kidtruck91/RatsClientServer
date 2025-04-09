@@ -24,7 +24,7 @@ class Game:
         #   If this is a fresh game (not a clone), create a deck and deal cards
         if not discard_pile and not draw_pile:
             self.draw_pile = Deck().cards[:] 
-            self.deal_initial_cards()
+        self.deal_initial_cards()
 
     @classmethod
     def from_existing(cls, existing_game):
@@ -45,7 +45,7 @@ class Game:
                 player.set_initial_cards(card1, card2, card3)
                 print(f"DEBUG: {player.name} received initial cards: {[Deck.card_to_string(card) for card in player.cards]}")
 
-    def handle_card_replacement(self, player, index, new_card):
+    def handle_card_replacement(self, player, index, new_card,client_socket=None):
         """Handles replacing a player's card, updating the discard pile, and clearing opponent memory if necessary."""
         print(f"DEBUG: Entering handle_card_replacement() for {player.name}. Index: {index}, New Card: {new_card}")
         print(f"DEBUG: {player.name}'s hand BEFORE replacement: {player.cards}")  #   Track pre-replacement state
@@ -73,15 +73,104 @@ class Game:
         if isinstance(self.last_discard, tuple):
             value, suit = self.last_discard  # Extract numeric value
             if value == 11:
-                print(f"{player.name} discarded a Jack! You may peek at a card.")
-                self.ask_peek_choice(player)
-            elif value == 12:
+                self.ask_peek_choice(player, client_socket)
+            if value == 12:
                 print(f"{player.name} discarded a Queen! Special action: Swap.")
-                self.swap_with_queen_human(player)
+                if client_socket:
+                    self.ask_queen_first_player(player, client_socket)
+                    return  # 👈 this is CRITICAL
+                else:
+                    print("sp Swap.")
+                    self.swap_with_queen_human(player)
 
     def get_available_actions(self):
         """Returns a list of available actions for the current player."""
         return ["draw", "call_rats"]
+    
+    def ask_queen_first_player(self, player, client_socket):
+        opponents = self.players[:]
+        opponent_list = "\n".join(f"{i}: {op.name}" for i, op in enumerate(opponents))
+
+        self.pending_prompts[player.name] = {
+            "type": "queen_pick_first_player",
+            "opponents": opponents
+        }
+
+        send_json(client_socket, {
+            "command": "prompt",
+            "type": "queen_pick_first_player",
+            "data": f"Choose a player to swap a card from:\n{opponent_list}"
+        })
+    
+    def ask_queen_first_card(self, player, target1, client_socket):
+        """Prompt player to choose a card from the first selected player (target1)."""
+        visible_cards = [
+            Deck.card_to_string(card) if (
+                (target1 == player and player.revealed_cards[i]) or
+                (target1 != player and player.name in target1.card_known_by[i])
+            ) else "?"
+            for i, card in enumerate(target1.cards)
+        ]
+
+        display_list = "\n".join(f"{i}: {card}" for i, card in enumerate(visible_cards))
+
+        self.pending_prompts[player.name] = {
+            "type": "queen_pick_first_card",
+            "target1": target1
+        }
+
+        send_json(client_socket, {
+            "command": "prompt",
+            "type": "queen_pick_first_card",
+            "data": f"Choose a card from {target1.name} to swap:\n{display_list}"
+        })
+
+    
+    def ask_queen_second_player(self, player, target1, index1, client_socket):
+        opponents = self.players[:]  # Include self
+        player_list = "\n".join(f"{i}: {p.name}" for i, p in enumerate(opponents))
+
+        self.pending_prompts[player.name] = {
+            "type": "queen_pick_second_player",
+            "target1": target1,
+            "index1": index1,
+            "opponents": opponents
+        }
+
+        send_json(client_socket, {
+            "command": "prompt",
+            "type": "queen_pick_second_player",
+            "data": f"Choose a second player to complete the swap:\n{player_list}"
+        })
+
+    def ask_queen_second_card(self, player, target1, index1, target2, client_socket):
+        visible_cards = [
+            Deck.card_to_string(card) if (
+                (target2 == player and player.revealed_cards[i]) or
+                (target2 != player and player.name in target2.card_known_by[i])
+            ) else "?"
+            for i, card in enumerate(target2.cards)
+        ]
+        card_list = "\n".join(f"{i}: {c}" for i, c in enumerate(visible_cards))
+
+        self.pending_prompts[player.name] = {
+            "type": "queen_pick_second_card",
+            "target1": target1,
+            "index1": index1,
+            "target2": target2
+        }
+
+        send_json(client_socket, {
+            "command": "prompt",
+            "type": "queen_pick_second_card",
+            "data": f"Choose a card from {target2.name} to complete the swap:\n{card_list}"
+        })
+
+
+
+
+
+
 
     def perform_action(self, player, action, client_socket=None, send_to_all=None):
         """Performs the specified action for the current player and sends updates to clients if in multiplayer."""
@@ -131,10 +220,11 @@ class Game:
 
         elif action == "call_rats":
             self.call_rats()
-
-    #   Notify all players that the turn has changed
-        self.advance_turn(client_socket, send_to_all)
-        print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
+        if player.name not in self.pending_prompts:
+            self.advance_turn(client_socket, send_to_all)
+            print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
+        else:
+            print(f"[DEBUG] {player.name} has pending prompts. Turn not advanced.")
 
     def draw_human(self, player, client_socket=None):
         """Draws a card and returns a prompt context for replacement (multiplayer safe)."""
