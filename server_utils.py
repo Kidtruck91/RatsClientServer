@@ -118,17 +118,19 @@ def handle_client(client_socket, player):
     try:
         while True:
             # Send updated game state
-            game_state = {
-                "command": "game_state",
-                "turn": game.players[game.turn].name,
-                "player_name": player.name,
-                "your_cards": [str(card) for card in player.get_visible_cards()],
-                "actions": game.get_available_actions(),
-                "discard_pile": [str(card) for card in game.discard_pile]
-            }
-            print(f"[DEBUG] Sending game state to {player.name}: {game_state}")
-            send_json(client_socket, game_state)
-
+            if player.name not in game.pending_prompts:
+                game_state = {
+                    "command": "game_state",
+                    "turn": game.players[game.turn].name,
+                    "player_name": player.name,
+                    "your_cards": [str(card) for card in player.get_visible_cards()],
+                    "actions": game.get_available_actions(),
+                    "discard_pile": [str(card) for card in game.discard_pile]
+                }
+                print(f"[DEBUG] Sending game state to {player.name}: {game_state}")
+                send_json(client_socket, game_state)
+            else:
+                print(f"[DEBUG] Skipping game_state for {player.name}, pending prompt exists.")
             # Receive next action/response
             action_data = receive_json(client_socket)
             print(f"[DEBUG] Received from {player.name}: {action_data}")

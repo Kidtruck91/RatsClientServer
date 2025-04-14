@@ -3,6 +3,7 @@ import socket
 import time
 import json
 import sys
+import select
 from network_utils import send_json, receive_json,send_to_server
 from game_logic import Game, Player,Deck
 SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with actual server IP
@@ -31,8 +32,11 @@ def handle_host_input(client):
             send_to_server(client, {"command": "start_game"})
             print("[DEBUG_CLIENT_UTILS_] Sent start command to server.")
             break  # ✅ Prevents infinite loop
+        else:
+            print("[ERROR_CLIENT_UTILS_] Invalid command. Type 'start' to begin the game.")
+            continue
 
-        print("[ERROR_CLIENT_UTILS_] Invalid command. Type 'start' to begin the game.")
+
 
 def parse_card_string(card_str):
     """Parses a string like '(11, 2)' into a tuple (11, 2), or returns '?'."""
