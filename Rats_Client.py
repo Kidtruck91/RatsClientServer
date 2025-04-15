@@ -6,7 +6,7 @@ SERVER_HOST = "ratsmpserver.ddns.net"
 SERVER_PORT = 5555
 
 def main():
-    """Game startup menu allowing choice between single-player, multiplayer, or exit."""
+    #Game startup menu allowing choice between single-player, multiplayer, or exit.
     print("[ENTER] main()")
 
     while True:
@@ -32,15 +32,6 @@ def main():
             print("[ERROR] Invalid input.")
 
     print("[EXIT] main()")
-
-
-
-
-
-
-
-
-
 
 if __name__ == "__main__":
     try:

@@ -50,10 +50,10 @@ class Player:
         score = 0
         for card in self.cards:
             value, suit = card  # Extract numeric value
-            if value == 13:  # King is worth 0 points
+            if value == 13:  
                 score += 0
-            elif value in [11, 12]:  # Jacks and Queens are worth 10 points
+            elif value in [11, 12]:  
                 score += 10
             else:
-                score += value  # Aces count as 1, all other numbers use their value
+                score += value  
         return score

@@ -78,7 +78,7 @@ def send_to_server(client_socket, message):
         else:  #   Otherwise, send as raw text
             message = message.strip() + "\n"
             client_socket.sendall(message.encode('utf-8'))
-            print(f"[DEBUG] Sent raw message to server: {message}")  #   Debug sent raw text
+            print(f"[DEBUG] Sent raw message to server: {message}")  #Debug sent raw text
     except Exception as e:
         print(f"[ERROR] Failed to send to server: {e}")
 def send_to_player(player_name, message):

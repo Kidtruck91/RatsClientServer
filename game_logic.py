@@ -10,7 +10,7 @@ class Game:
         """Initializes a new game or clones an existing game."""
         self.players = list(players) if players else []
         self.discard_pile = discard_pile[:] if discard_pile else []
-        self.draw_pile = draw_pile[:] if draw_pile else Deck().cards[:]  # Preserve deck order
+        self.draw_pile = draw_pile[:] if draw_pile else Deck().cards[:]
         self.turn = turn
         self.rats_caller = None
         self.rats_called = False
@@ -21,7 +21,7 @@ class Game:
         self.special_action_available = False
         self.pending_prompts = {} 
 
-        #   If this is a fresh game (not a clone), create a deck and deal cards
+        #   If this is a fresh game, create a deck and deal cards
         if not discard_pile and not draw_pile:
             self.draw_pile = Deck().cards[:] 
         self.deal_initial_cards()
@@ -30,9 +30,9 @@ class Game:
     def from_existing(cls, existing_game):
         """Creates a deep copy of an existing Game object."""
         return cls(
-            players=[Player(p.name, p.cards[:]) for p in existing_game.players],  # Clone players
-            discard_pile=existing_game.discard_pile[:],  #Clone discard pile
-            draw_pile=existing_game.draw_pile[:],  #Clone deck order
+            players=[Player(p.name, p.cards[:]) for p in existing_game.players], 
+            discard_pile=existing_game.discard_pile[:], 
+            draw_pile=existing_game.draw_pile[:], 
             turn=existing_game.turn
         )
 
@@ -78,7 +78,7 @@ class Game:
                 print(f"{player.name} discarded a Queen! Special action: Swap.")
                 if client_socket:
                     self.ask_queen_first_player(player, client_socket)
-                    return  # 👈 this is CRITICAL
+                    return
                 else:
                     print("sp Swap.")
                     self.swap_with_queen_human(player)
@@ -201,20 +201,20 @@ class Game:
                 return
 
             if client_socket:
-                # Queue these messages and wait for response in handle_client
+                # Queue messages and wait for response in handle_client
                 send_json(client_socket, tell_msg)
                 send_json(client_socket, prompt_msg)
 
-                # Store this pending prompt context somewhere (example below)
+                # Store pending prompt
                 self.pending_prompts[player.name] = {
                     "type": "card_replacement",
                     "card": drawn_card,
                 }
 
-                return  # Wait for handle_client() to finish on response
+                return  
 
             else:
-                # Single-player: already handled
+                # Single-player fallback
                 self.handle_card_replacement(player, prompt_msg, drawn_card)
 
 
@@ -237,13 +237,12 @@ class Game:
         print(f"{player.name} drew a {card_str}")
 
         if client_socket:
-            # Do not block for input — just return prompt context
             tell_message = {"command": "tell", "message": f"You drew a {card_str}"}
             prompt_message = {
                 "command": "prompt",
                 "type": "card_replacement",
                 "data": "Choose which card to replace (0, 1, 2) or -1 to discard:",
-                "card_drawn": str(drawn_card),  # Optional: for logging/debug
+                "card_drawn": str(drawn_card),
             }
             return drawn_card, tell_message, prompt_message
         else:
@@ -297,19 +296,19 @@ class Game:
         # Swap the cards
         player.cards[give_index], opponent.cards[take_index] = opponent.cards[take_index], player.cards[give_index]
 
-        # **Knowledge Transfer Rules:**
+        # Knowledge Transfer Rules:
         # 1. The player KNOWS they gave this card away, so the opponent must know they have it and the opponent knows what they gave away.
         opponent.reveal_card_to(take_index, player.name)
         player.reveal_card_to(give_index, opponent.name)
-        # 2. The player does NOT know what they received unless they already knew it before.
+        # 2. The player does not know what they received unless they already knew it before.
         if player.name not in opponent.card_known_by[take_index]:  #   Check if the player previously saw this card
             player.revealed_cards[give_index] = False  # Hide the received card from the player
 
         # 3. The opponent does NOT know what they received unless they already knew it before.
-        if opponent.name not in player.card_known_by[give_index]:  #   Corrected to track card knowledge properly
+        if opponent.name not in player.card_known_by[give_index]:
             opponent.revealed_cards[take_index] = False   # Hide the received card from the opponent
 
-        print(f"{player.name} swapped a card with {opponent.name}. Only logical knowledge is transferred.")
+        print(f"{player.name} swapped a card with {opponent.name}.")
 
 
     def ask_peek_choice(self, player, client_socket=None):

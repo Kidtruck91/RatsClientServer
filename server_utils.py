@@ -15,8 +15,8 @@ game = None
 # Cards dealt to players first
 cards = [
     (7, 0), (8, 1), (9, 2),
-    (12, 0), 
-    (4, 1), (5, 2), (12, 2),                 
+            (11, 0),        #Draw pile start
+    (4, 1), (5, 2), (12, 2),  #Player 2 hand        
     (6, 3), (11, 0), (2, 1), #Player 1 hand
 ]
 
@@ -46,7 +46,7 @@ def start_game():
     global game, connected_players, connected_clients
     print("[ENTER] start_game()")
 
-    # Initialize game using known-good list of Player objects
+    
     
     #game = Game(connected_players)
     game = Game(connected_players, draw_pile=rigged_deck.cards)

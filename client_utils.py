@@ -31,7 +31,7 @@ def handle_host_input(client):
         if command == "start":
             send_to_server(client, {"command": "start_game"})
             print("[DEBUG_CLIENT_UTILS_] Sent start command to server.")
-            break  #   Prevents infinite loop
+            break
         else:
             print("[ERROR_CLIENT_UTILS_] Invalid command. Type 'start' to begin the game.")
             continue
@@ -85,7 +85,6 @@ def handle_server_messages(client):
                         break
                     case "start":
                         print("[DEBUG_CLIENT_UTILS_handle_server_messages] Game started! Entering game loop...")
-                        #play_multiplayer_game(client)
                         continue
 
                     case "your_turn":
@@ -188,33 +187,6 @@ def run_cli_game(game):
     winner = min(game.players, key=lambda p: p.get_total_score())
     print(f"{winner.name} wins!")
 
-def run_multiplayer_clientv2():
-    """Handles client-side multiplayer connection to the server."""
-    print("\nStarting Multiplayer Mode...")
-    try:
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((SERVER_HOST, SERVER_PORT))
-        print("[DEBUG_CLIENT_UTILS_] Connected to server.")
-
-        # Start listening for server messages
-        threading.Thread(target=handle_server_messages, args=(client,), daemon=True).start()
-
-        # Receive initial game state
-        game_state = receive_json(client)
-        print(f"[DEBUG_CLIENT_UTILS_] Received game state: {game_state}")
-        if game_state and game_state.get("command") == "host_control":
-            print("[DEBUG_CLIENT_UTILS_] This player is the host.")
-            handle_host_input(client)  #   Call it directly instead of threading
-        
-        else:
-            print("[DEBUG_CLIENT_UTILS_] Waiting for the host to start the game...")
-
-    except ConnectionRefusedError:
-        print("Could not connect to the server. Ensure the server is running.")
-
-    finally:
-        client.close()
-
 def run_multiplayer_client():
     """Handles client-side multiplayer connection to the server."""
     print("[DEBUG_CLIENT_UTILS_] Entering run_multiplayer_client")
@@ -234,7 +206,7 @@ def run_multiplayer_client():
         else:
             print("[DEBUG_CLIENT_UTILS_] Waiting for the host to start the game...")
 
-        #   Wait for server thread to finish (i.e., game over or disconnect)
+        #   Wait for server thread to finish (game over or disconnect)
         thread.join()
 
     except ConnectionRefusedError:

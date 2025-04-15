@@ -10,7 +10,7 @@ class Deck:
         random.shuffle(self.cards)
 
     @classmethod
-    def fixed_deck(cls, fixed_cards):  #   Correct method name
+    def fixed_deck(cls, fixed_cards):
         """Creates a deck with a predefined order instead of a shuffled deck."""
         deck = cls.__new__(cls)  
         deck.cards = list(fixed_cards)  

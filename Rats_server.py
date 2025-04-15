@@ -21,7 +21,6 @@ def start_server():
     print("📢 Waiting for players to connect...\n")
 
     try:
-        #   Fix: Pass `send_json` when calling `accept_new_players`
         print("[DEBUG] Starting accept_new_players thread...")
         threading.Thread(target=accept_new_players, args=(server, send_to_all, send_json), daemon=True).start()
 
@@ -58,7 +57,7 @@ def start_server():
         server.close()
 
 if __name__ == "__main__":
-    print("[DEBUG] Running Rats server...")  #   Ensure this appears in logs
+    print("[DEBUG] Running Rats server...")  
     try:
         start_server()
     except Exception as e:
