@@ -6,7 +6,7 @@ import sys
 import select
 from network_utils import send_json, receive_json,send_to_server
 from game_logic import Game, Player,Deck
-SERVER_HOST = "ratsmpserver.ddns.net"  # Replace with actual server IP
+SERVER_HOST = "ratsmpserver.ddns.net"  
 SERVER_PORT = 5555
 
 def handle_host_input(client):
@@ -16,7 +16,7 @@ def handle_host_input(client):
     while True:
         print("Type 'start' to begin the game (minimum 2 players required).")
         
-        # ✅ Check the number of players before allowing "start"
+        #   Check the number of players before allowing "start"
         game_state = receive_json(client)
         if game_state.get("command") == "waiting":
             players = game_state.get("players", [])
@@ -24,14 +24,14 @@ def handle_host_input(client):
 
             if len(players) < 2:
                 print("[ERROR_CLIENT_UTILS_] At least 2 players are required to start the game.")
-                time.sleep(2)  # ✅ Prevent spam, wait before checking again
-                continue  # ✅ Keep checking until enough players join
+                time.sleep(2)  #   Prevent spam, wait before checking again
+                continue  #   Keep checking until enough players join
 
         command = input(">> ").strip().lower()
         if command == "start":
             send_to_server(client, {"command": "start_game"})
             print("[DEBUG_CLIENT_UTILS_] Sent start command to server.")
-            break  # ✅ Prevents infinite loop
+            break  #   Prevents infinite loop
         else:
             print("[ERROR_CLIENT_UTILS_] Invalid command. Type 'start' to begin the game.")
             continue
@@ -204,7 +204,7 @@ def run_multiplayer_clientv2():
         print(f"[DEBUG_CLIENT_UTILS_] Received game state: {game_state}")
         if game_state and game_state.get("command") == "host_control":
             print("[DEBUG_CLIENT_UTILS_] This player is the host.")
-            handle_host_input(client)  # ✅ Call it directly instead of threading
+            handle_host_input(client)  #   Call it directly instead of threading
         
         else:
             print("[DEBUG_CLIENT_UTILS_] Waiting for the host to start the game...")
@@ -223,7 +223,7 @@ def run_multiplayer_client():
         client.connect((SERVER_HOST, SERVER_PORT))
         print("[DEBUG_CLIENT_UTILS_] Connected to server.")
 
-        # ✅ Start listening for server messages in a separate thread
+        #   Start listening for server messages in a separate thread
         thread = threading.Thread(target=handle_server_messages, args=(client,), daemon=False)
         thread.start()
 
@@ -234,7 +234,7 @@ def run_multiplayer_client():
         else:
             print("[DEBUG_CLIENT_UTILS_] Waiting for the host to start the game...")
 
-        # ✅ Wait for server thread to finish (i.e., game over or disconnect)
+        #   Wait for server thread to finish (i.e., game over or disconnect)
         thread.join()
 
     except ConnectionRefusedError:

@@ -10,7 +10,7 @@ class Deck:
         random.shuffle(self.cards)
 
     @classmethod
-    def fixed_deck(cls, fixed_cards):  # ✅ Correct method name
+    def fixed_deck(cls, fixed_cards):  #   Correct method name
         """Creates a deck with a predefined order instead of a shuffled deck."""
         deck = cls.__new__(cls)  
         deck.cards = list(fixed_cards)  
@@ -20,8 +20,8 @@ class Deck:
     def card_to_string(card):
         """Converts a card tuple (value, suit) into a human-readable string."""
         value, suit = card
-        value_str = Deck.VALUE_NAMES.get(value, str(value))  # ✅ Convert 1 to A, 11-13 to J/Q/K
-        suit_str = Deck.SUITS[suit]  # ✅ Convert 0-3 to suit names
+        value_str = Deck.VALUE_NAMES.get(value, str(value))  #   Convert 1 to A, 11-13 to J/Q/K
+        suit_str = Deck.SUITS[suit]  #   Convert 0-3 to suit names
         return f"{value_str} of {suit_str}"
     
     def draw(self):

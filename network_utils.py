@@ -9,7 +9,7 @@ client_socket_lookup = {}
 def send_json(client_socket, data):
     """Encodes and sends JSON data over a socket."""
     try:
-        json_data = json.dumps(data) + "\n"  # Ensure newline for message boundaries
+        json_data = json.dumps(data) + "\n"  
         client_socket.sendall(json_data.encode('utf-8'))
         print(f"[DEBUG] Sent JSON data: {json_data}")
     except Exception as e:
@@ -26,14 +26,14 @@ def receive_json(client_socket):
             buffer += chunk
 
             messages = buffer.split("\n")
-            for msg in messages[:-1]:  # Process complete JSON messages
-                print(f"[DEBUG] Received raw message: {msg}")  # ✅ Debug received message
-                return json.loads(msg)  # Parse first complete JSON object
+            for msg in messages[:-1]:  
+                print(f"[DEBUG] Received raw message: {msg}")
+                return json.loads(msg)
 
-            buffer = messages[-1]  # Keep partial message in buffer
+            buffer = messages[-1]
         except json.JSONDecodeError as e:
             print(f"[ERROR] JSON decode error: {e} (Raw message: {buffer})")
-            continue  # Wait for more data
+            continue
         except ConnectionAbortedError:
             print("[ERROR] Connection was closed by the server.")
             sys.exit(0)
@@ -51,17 +51,17 @@ def receive_message(client_socket):
             buffer += chunk
 
             messages = buffer.split("\n")
-            for msg in messages[:-1]:  # Process complete messages
-                print(f"[DEBUG] Server received raw message: {msg}")  # ✅ Debugging received message
+            for msg in messages[:-1]:
+                print(f"[DEBUG] Server received raw message: {msg}")
                 try:
                     json_msg = json.loads(msg)
-                    print(f"[DEBUG] Parsed JSON message: {json_msg}")  # ✅ Show parsed JSON
-                    return json_msg  # ✅ If it's JSON, return it as a dictionary
+                    print(f"[DEBUG] Parsed JSON message: {json_msg}")
+                    return json_msg  #If JSON, return as a dictionary
                 except json.JSONDecodeError:
-                    print(f"[DEBUG] Received raw text: {msg.strip()}")  # ✅ Show raw text
-                    return msg.strip()  # ✅ Otherwise, return as a plain string
+                    print(f"[DEBUG] Received raw text: {msg.strip()}")
+                    return msg.strip()  #Otherwise, return plain string
 
-            buffer = messages[-1]  # Keep partial message in buffer
+            buffer = messages[-1]
         except ConnectionAbortedError:
             print("[ERROR] Connection was closed by the client.")
             return None
@@ -71,14 +71,14 @@ def receive_message(client_socket):
 def send_to_server(client_socket, message):
     """Sends a raw message (text or JSON) to the server."""
     try:
-        if isinstance(message, dict):  # ✅ If it's JSON, send it properly
+        if isinstance(message, dict):  
             json_data = json.dumps(message) + "\n"
             client_socket.sendall(json_data.encode('utf-8'))
-            print(f"[DEBUG] Sent JSON to server: {json_data}")  # ✅ Debug sent JSON
-        else:  # ✅ Otherwise, send as raw text
+            print(f"[DEBUG] Sent JSON to server: {json_data}")  #   Debug sent JSON
+        else:  #   Otherwise, send as raw text
             message = message.strip() + "\n"
             client_socket.sendall(message.encode('utf-8'))
-            print(f"[DEBUG] Sent raw message to server: {message}")  # ✅ Debug sent raw text
+            print(f"[DEBUG] Sent raw message to server: {message}")  #   Debug sent raw text
     except Exception as e:
         print(f"[ERROR] Failed to send to server: {e}")
 def send_to_player(player_name, message):
@@ -105,6 +105,6 @@ def send_to_all(message):
     print(f"[DEBUG] send_to_all() called with: {message}")
     for client_socket, _ in connected_clients:
         try:
-            send_json(client_socket, message)  # ✅ Uses send_json() for consistency
+            send_json(client_socket, message)
         except Exception as e:
             print(f"[ERROR] Failed to send to client {client_socket}: {e}")

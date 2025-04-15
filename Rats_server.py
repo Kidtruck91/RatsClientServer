@@ -21,25 +21,25 @@ def start_server():
     print("📢 Waiting for players to connect...\n")
 
     try:
-        # ✅ Fix: Pass `send_json` when calling `accept_new_players`
+        #   Fix: Pass `send_json` when calling `accept_new_players`
         print("[DEBUG] Starting accept_new_players thread...")
         threading.Thread(target=accept_new_players, args=(server, send_to_all, send_json), daemon=True).start()
 
-        # ✅ Ensure at least 2 players before waiting for start
+        #   Ensure at least 2 players before waiting for start
         while len(connected_players) < 2:
             print(f"[DEBUG] Waiting for players to join... (Current: {len(connected_players)})")
-            time.sleep(1)  # ✅ Prevents infinite loop from blocking execution
+            time.sleep(1)  #   Prevents infinite loop from blocking execution
 
         print("[DEBUG] Finished player connection loop, waiting for host input...")
 
-        # ✅ Wait for host input to start the game
+        #   Wait for host input to start the game
         while True:
-            if len(connected_clients) > 0:  # ✅ Ensure clients exist before accessing
+            if len(connected_clients) > 0:  #   Ensure clients exist before accessing
                 try:
                     print("[DEBUG] Waiting for host to start the game...")
-                    game_start_msg = receive_message(connected_clients[0][0])  # ✅ Host input
+                    game_start_msg = receive_message(connected_clients[0][0])  #   Host input
 
-                    print(f"[DEBUG] Received message from host: {game_start_msg}")  # ✅ Debugging received data
+                    print(f"[DEBUG] Received message from host: {game_start_msg}")  #   Debugging received data
 
                     if isinstance(game_start_msg, dict) and game_start_msg.get("command") == "start_game":
                         print("[DEBUG] Received 'start_game' command from host. Starting game...")
@@ -58,7 +58,7 @@ def start_server():
         server.close()
 
 if __name__ == "__main__":
-    print("[DEBUG] Running Rats server...")  # ✅ Ensure this appears in logs
+    print("[DEBUG] Running Rats server...")  #   Ensure this appears in logs
     try:
         start_server()
     except Exception as e:

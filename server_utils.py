@@ -14,10 +14,10 @@ game = None
 
 # Cards dealt to players first
 cards = [
-    (7, 0), (8, 1), (9, 2),  # Player 1's hand
-    (12, 0), (4, 1), (5, 2),  # Player 2's hand
-    (12, 2),                 # 👈 Player 1's first draw — Queen of Hearts
-    (6, 3), (11, 0), (2, 1), # More filler cards if needed
+    (7, 0), (8, 1), (9, 2),
+    (12, 0), 
+    (4, 1), (5, 2), (12, 2),                 
+    (6, 3), (11, 0), (2, 1), #Player 1 hand
 ]
 
 # Create a fixed deck
@@ -33,7 +33,7 @@ def update_noip():
     response = requests.get(url, auth=(NOIP_USERNAME, NOIP_UPDATE_KEY))
 
     if "good" in response.text or "nochg" in response.text:
-        print(f"✅ No-IP Updated Successfully: {response.text}")
+        print(f"  No-IP Updated Successfully: {response.text}")
     else:
         print(f"❌ No-IP Update Failed: {response.status_code} - {response.text}")
 

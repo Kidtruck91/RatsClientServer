@@ -40,7 +40,7 @@ class Game:
     def deal_initial_cards(self):
         """Deal initial cards to each player at the start of the game."""
         for player in self.players:
-            if not player.cards:  # ✅ Only assign cards if the player has none
+            if not player.cards:  #   Only assign cards if the player has none
                 card1, card2, card3 = self.draw_pile.pop(), self.draw_pile.pop(), self.draw_pile.pop()
                 player.set_initial_cards(card1, card2, card3)
                 print(f"DEBUG: {player.name} received initial cards: {[Deck.card_to_string(card) for card in player.cards]}")
@@ -384,7 +384,7 @@ class Game:
         if send_to_all:
             send_to_all({"command": "message", "data": f"{self.players[self.turn].name} called 'Rats'!"})
 
-        # ✅ Send a private message to the next player
+        #   Send a private message to the next player
         if client_socket:
             send_to_client(client_socket, {"command": "final_turn", "message": "You have one last turn!"})
 
