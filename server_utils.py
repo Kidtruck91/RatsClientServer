@@ -48,8 +48,8 @@ def start_game():
 
     
     
-    #game = Game(connected_players)
-    game = Game(connected_players, draw_pile=rigged_deck.cards)
+    game = Game(connected_players)
+    #game = Game(connected_players, draw_pile=rigged_deck.cards)
     print("[DEBUG] Game initialized with players:", [p.name for p in connected_players])
 
     # Notify all clients

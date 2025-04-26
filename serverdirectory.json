@@ -1,0 +1,17 @@
+[
+    {
+        "name": "RatsMainServer",
+        "hostname": "ratsmpserver.ddns.net",
+        "port": 5555
+    },
+    {
+        "name": "RatsServerA",
+        "hostname": "RatsServerA.ddns.net",
+        "port": 53
+    },
+    {
+        "name": "RatsServerB",
+        "hostname": "RatsServerB.ddns.net",
+        "port": 5554
+    }
+]
