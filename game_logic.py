@@ -392,22 +392,23 @@ class Game:
             
     def end_game(self, send_to_all=None):
         """Handles scoring and ends the game."""
-        self.game_over = True
-
-        scores = [player.get_total_score() for player in self.players]
+        scores = {player.name: player.get_total_score() for player in self.players}
         winner = min(self.players, key=lambda p: p.get_total_score())
 
-        print(f"\nGame Over!\nFinal Scores:")
-        for player in self.players:
-            print(f"{player.name}: {player.get_total_score()} points")
+        game_over_text = "\n🏁 GAME OVER 🏁\n"
+        game_over_text += "=" * 40 + "\n"
+        game_over_text += "Final Scores:\n"
 
-        print(f"{winner.name} wins!")
+        for player_name, score in scores.items():
+            game_over_text += f"  - {player_name}: {score} points\n"
+
+        game_over_text += "\n🎉 WINNER: {} 🎉\n".format(winner.name)
+        game_over_text += "=" * 40
+
+        print(game_over_text)
 
         if send_to_all:
-            send_to_all({
-                "command": "message",
-                "data": f"Game Over! Winner: {winner.name} with {winner.get_total_score()} points."
-            })
-            send_to_all({
-                "command": "game_over"
-            })
+            send_to_all({"command": "game_over", "message": game_over_text})
+
+        self.game_over = True
+

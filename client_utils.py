@@ -83,6 +83,9 @@ def handle_server_messages(client):
                     case "game_over":
                         print("[INFO] Game over received. Exiting handler.")
                         break
+
+
+                    
                     case "start":
                         print("[DEBUG_CLIENT_UTILS_handle_server_messages] Game started! Entering game loop...")
                         continue
@@ -117,14 +120,20 @@ def handle_server_messages(client):
 
                         if player_name and current_turn:
                             if current_turn == player_name:
-                                print(f"[DEBUG_CLIENT_UTILS_handle_server_messages] {player_name}, it's your turn!")
-
+                                print("\n" + "=" * 40)
+                                print(f"▶️  It's your turn, {player_name}!")
+                                print("=" * 40)
                                 readable_cards = [
                                     "?" if card == "?" else Deck.card_to_string(parse_card_string(card))
                                     for card in game_state.get("your_cards", [])
                                 ]
-                                print(f"\nYour cards: {readable_cards}")
-                                print(f"Available actions: {', '.join(game_state.get('actions', []))}")
+                                print("\n--- Your Hand ---")
+                                for idx, card in enumerate(readable_cards):
+                                    print(f"  [{idx}] {card}")
+                                print("\n--- Available Actions ---")
+                                for action in game_state.get("actions", []):
+                                    print(f"  - {action}")
+                                print()
                                 action = input("Choose an action: ").strip()
                                 send_json(client, {"command": "action", "data": action})
                             else:
