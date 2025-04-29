@@ -220,6 +220,9 @@ class Game:
 
         elif action == "call_rats":
             self.call_rats()
+            print(f"DEBUG: Ending action '{action}' for {player.name} after calling Rats.")
+            return
+
         if player.name not in self.pending_prompts:
             self.advance_turn(client_socket, send_to_all)
             print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
