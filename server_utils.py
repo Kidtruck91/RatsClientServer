@@ -48,8 +48,8 @@ def start_game():
 
     
     
-    #game = Game(connected_players)
-    game = Game(connected_players, draw_pile=rigged_deck.cards)
+    game = Game(connected_players)
+    #game = Game(connected_players, draw_pile=rigged_deck.cards)
     print("[DEBUG] Game initialized with players:", [p.name for p in connected_players])
 
     # Notify all clients
@@ -250,6 +250,7 @@ def response_case(player, client_socket, action_data):
                     "type": "peek_opponent_card_index",
                     "data": f"Choose a card to peek at from {opponent.name} (0, 1, 2):"
                 })
+                return
             except Exception:
                 send_to_player(player, {
                     "command": "tell",
