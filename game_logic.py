@@ -84,9 +84,13 @@ class Game:
                     self.swap_with_queen_human(player)
 
     def get_available_actions(self):
-        """Returns a list of available actions for the current player."""
-        return ["draw", "call_rats"]
-    
+        actions = ["draw", "call_rats"]
+
+        if self.rats_called:
+            actions.remove("call_rats")
+
+        return actions
+        
     def ask_queen_first_player(self, player, client_socket):
         opponents = self.players[:]
         opponent_list = "\n".join(f"{i}: {op.name}" for i, op in enumerate(opponents))
@@ -220,15 +224,12 @@ class Game:
 
         elif action == "call_rats":
             self.call_rats(client_socket, send_to_all)
-            self.advance_turn(client_socket, send_to_all)
             print(f"DEBUG: Ending action '{action}' for {player.name} after calling Rats.")
             return
 
-        if player.name not in self.pending_prompts:
-            self.advance_turn(client_socket, send_to_all)
-            print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
-        else:
-            print(f"[DEBUG] {player.name} has pending prompts. Turn not advanced.")
+       
+        print(f"DEBUG: Ending action '{action}' for {player.name}. Next turn: {self.players[self.turn].name}")
+       
 
     def draw_human(self, player, client_socket=None):
         """Draws a card and returns a prompt context for replacement (multiplayer safe)."""
@@ -378,36 +379,35 @@ class Game:
             print(f"You peeked at your card: {Deck.card_to_string(card)}")
                 
     def call_rats(self, client_socket=None, send_to_all=None):
-        """Handles the 'Rats' call and sets up the final turn."""
+        """Handles when a player calls 'Rats'."""
         print(f"{self.players[self.turn].name} calls 'Rats'!")
         self.rats_called = True
         self.rats_caller = self.players[self.turn].name
-        next_player = self.players[(self.turn + 1) % len(self.players)]
-
         if send_to_all:
             send_to_all({"command": "message", "data": f"{self.players[self.turn].name} called 'Rats'!"})
-
-        #   Send a private message to the next player
-        if client_socket:
-            send_to_client(client_socket, {"command": "tell", "message": "You have one last turn!"})
-
-        print(f"{next_player.name} gets one final turn!")
-
-    def advance_turn(self, client_socket=None, send_to_all=None):
-        """Advances the turn to the next player and updates clients if in multiplayer."""
+    
+    def advance_turn(self):
+        """Advances the turn to the next player."""
         self.turn = (self.turn + 1) % len(self.players)
-        if client_socket and send_to_all:
-            send_to_all({
-                "command": "message",
-                "data": f"Turn has advanced to: {self.players[self.turn].name}"
-            })
             
-    def end_game(self):
+    def end_game(self, send_to_all=None):
         """Handles scoring and ends the game."""
+        self.game_over = True
+
         scores = [player.get_total_score() for player in self.players]
         winner = min(self.players, key=lambda p: p.get_total_score())
-        print(f"\nGame Over!\n {scores}")
+
+        print(f"\nGame Over!\nFinal Scores:")
         for player in self.players:
             print(f"{player.name}: {player.get_total_score()} points")
+
         print(f"{winner.name} wins!")
-        self.game_over = True
+
+        if send_to_all:
+            send_to_all({
+                "command": "message",
+                "data": f"Game Over! Winner: {winner.name} with {winner.get_total_score()} points."
+            })
+            send_to_all({
+                "command": "game_over"
+            })

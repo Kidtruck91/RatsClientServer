@@ -1,7 +1,7 @@
 import threading
 import socket
 import requests
-
+import time
 from network_utils import connected_clients,connected_players,client_socket_lookup, SERVER_HOST,SERVER_PORT, send_json, receive_json,send_to_all,send_to_client,send_to_player
 from game_logic import Game, Player,Deck
 NOIP_HOSTNAME = "ratsmpserver.ddns.net"
@@ -65,7 +65,6 @@ def start_game():
 
 
 def accept_new_players(server, send_to_all, send_json):
-    """Continuously accepts new player connections while waiting for the host to start the game."""
     from network_utils import connected_players, connected_clients, client_socket_lookup
     print("[DEBUG] accept_new_players() started!")
 
@@ -73,6 +72,12 @@ def accept_new_players(server, send_to_all, send_json):
         try:
             client_socket, addr = server.accept()
             print(f"[DEBUG] New connection from {addr}")
+
+            # 🚨 ADD THIS: reject new players if game started
+            if game is not None and game.game_over == False:
+                print("[WARNING] Game already started. Rejecting new connection.")
+                client_socket.close()
+                continue
 
             player_id = len(connected_players) + 1
             new_player = Player(f"Player {player_id}")
@@ -92,24 +97,40 @@ def accept_new_players(server, send_to_all, send_json):
             print(f"[ERROR] Failed to accept new connection: {e}")
 
 def end_turn_and_update_all(client_socket=None, send_to_all=None):
-    game.advance_turn(client_socket, send_to_all)
-    next_player = game.players[game.turn]
+    game.advance_turn()
+    current_player = game.players[game.turn]
+
+    # 🚨 Check if the current player is the Rats caller
+    if game.rats_called and current_player.name == game.rats_caller:
+        print(f"[DEBUG] {current_player.name} was the Rats caller. Ending the game immediately.")
+        game.end_game(send_to_all)
+        return
+
+    # Otherwise, normal turn flow
     send_to_all({
         "command": "message",
-        "data": f"Turn has advanced to: {next_player.name}"
+        "data": f"Turn has advanced to: {current_player.name}"
     })
+    time.sleep(0.05)
+    if game.rats_called:
+        send_to_all({
+            "command": "message",
+            "data": f"Reminder: {game.rats_caller} has called 'Rats!' — this is the final round!"
+        })
+    time.sleep(0.05)
     for p in game.players:
         client = client_socket_lookup[p.name]
         game_state = {
             "command": "game_state",
-            "turn": game.players[game.turn].name,
+            "turn": current_player.name,
             "player_name": p.name,
             "your_cards": [str(card) for card in p.get_visible_cards()],
             "actions": game.get_available_actions(),
             "discard_pile": [str(card) for card in game.discard_pile]
         }
+        print(f"[DEBUG] Sending game_state to {p.name}. Turn: {current_player.name}")
         send_json(client, game_state)
-
+        time.sleep(0.05)
 def handle_client(client_socket, player):
     """Handles communication with a single client after the game starts."""
     global game
@@ -387,6 +408,12 @@ def action_case(player, client_socket, action_data):
         if game.game_over:
             print("[DEBUG] Game over! Notifying clients.")
             send_json(client_socket, {"command": "game_over"})
+            return
+
+        # 🛠️ NEW: after action, if player has no pending prompts, end turn
+        if player.name not in game.pending_prompts:
+            end_turn_and_update_all(client_socket, send_to_all)
+
     else:
         print(f"[DEBUG] {player.name} attempted an action out of turn.")
 

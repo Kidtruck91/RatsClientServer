@@ -95,6 +95,9 @@ def handle_server_messages(client):
 
                     case "message":
                         print(f"[UPDATE_CLIENT_UTILS_handle_server_messages] {game_state.get('data')}")
+                        print("[DEBUG_CLIENT_UTILS_handle_server_messages] Finished handling message, waiting for next server data.")
+                    
+                            
 
                     case "prompt":
                         prompt_type = game_state.get("type", "generic")
@@ -110,6 +113,8 @@ def handle_server_messages(client):
                     case "game_state":
                         player_name = game_state.get("player_name")
                         current_turn = game_state.get("turn")
+                        print(f"[DEBUG_CLIENT_UTILS_handle_server_messages] Processing new game_state for {player_name}.")
+
                         if player_name and current_turn:
                             if current_turn == player_name:
                                 print(f"[DEBUG_CLIENT_UTILS_handle_server_messages] {player_name}, it's your turn!")
