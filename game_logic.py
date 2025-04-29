@@ -389,14 +389,18 @@ class Game:
 
         #   Send a private message to the next player
         if client_socket:
-            send_to_client(client_socket, {"command": "final_turn", "message": "You have one last turn!"})
+            send_to_client(client_socket, {"command": "tell", "message": "You have one last turn!"})
 
         print(f"{next_player.name} gets one final turn!")
 
-    def advance_turn(self):
+    def advance_turn(self, client_socket=None, send_to_all=None):
         """Advances the turn to the next player and updates clients if in multiplayer."""
         self.turn = (self.turn + 1) % len(self.players)
-        
+        if client_socket and send_to_all:
+            send_to_all({
+                "command": "message",
+                "data": f"Turn has advanced to: {self.players[self.turn].name}"
+            })
             
     def end_game(self):
         """Handles scoring and ends the game."""

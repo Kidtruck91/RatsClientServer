@@ -91,8 +91,8 @@ def accept_new_players(server, send_to_all, send_json):
         except Exception as e:
             print(f"[ERROR] Failed to accept new connection: {e}")
 
-def end_turn_and_update_all():
-    game.advance_turn()
+def end_turn_and_update_all(client_socket=None, send_to_all=None):
+    game.advance_turn(client_socket, send_to_all)
     next_player = game.players[game.turn]
     send_to_all({
         "command": "message",
@@ -145,7 +145,7 @@ def handle_client(client_socket, player):
                     continue  
 
                 case "response":
-                    response_case(player, client_socket, action_data)
+                    response_case(player, client_socket, action_data,send_to_all)
                     continue
   
 
@@ -162,7 +162,7 @@ def handle_client(client_socket, player):
         print(f"[EXIT] handle_client({player.name})")
         client_socket.close()
 
-def response_case(player, client_socket, action_data):
+def response_case(player, client_socket, action_data, send_to_all):
     """Handles a single response to a server prompt."""
     global game
     print("[DEBUG] Starting response case")
@@ -203,7 +203,7 @@ def response_case(player, client_socket, action_data):
 
             game.handle_card_replacement(player, replace_index, drawn_card, client_socket)
             if player.name not in game.pending_prompts:
-                end_turn_and_update_all()
+                end_turn_and_update_all(client_socket, send_to_all)
             return
 
         # --- Jack Logic
@@ -232,7 +232,7 @@ def response_case(player, client_socket, action_data):
                     "command": "tell",
                     "message": "Invalid index. Enter 0, 1, or 2."
                 })
-            end_turn_and_update_all()
+            end_turn_and_update_all(client_socket, send_to_all)
             return
 
         case "peek_opponent_select":
@@ -273,7 +273,7 @@ def response_case(player, client_socket, action_data):
                     "command": "tell",
                     "message": "Invalid index. Try 0, 1, or 2."
                 })
-            end_turn_and_update_all()
+            end_turn_and_update_all(client_socket, send_to_all)
             return
 
         # --- Queen Logic
@@ -367,7 +367,7 @@ def response_case(player, client_socket, action_data):
                     "command": "tell",
                     "message": "Invalid selection. Try again."
                 })
-            end_turn_and_update_all()
+            end_turn_and_update_all(client_socket, send_to_all)
             return
 
         # --- Fallback
